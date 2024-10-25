@@ -11,8 +11,8 @@
  * Typedefs
  */
 
-typedef float data_t;
-typedef double acc_t;
+typedef int16_t data_t;
+typedef int32_t acc_t;
 
 typedef struct {
     acc_t re;
