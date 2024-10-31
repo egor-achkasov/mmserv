@@ -1,3 +1,4 @@
+from os import path
 import numpy as np
 
 
@@ -9,14 +10,14 @@ def read_defines():
         int: Number of transmit antennas
         int: Number of subcarriers
     """
-    with open(__file__[:__file__.rfind("/")] + "/../inc/define.h", "r") as f:
+    with open(path.join(path.dirname(__file__), "..", "inc", "define.h"), "r") as f:
         lines = f.read().split("\n")
     for line in lines:
-        if line[:19] == "#define NUM_RX_ANT ":
+        if line.startswith("#define NUM_RX_ANT "):
             NUM_RX_ANT = int(line[19:])
-        if line[:19] == "#define NUM_TX_ANT ":
+        if line.startswith("#define NUM_TX_ANT "):
             NUM_TX_ANT = int(line[19:])
-        if line[:15] == "#define NUM_SC ":
+        if line.startswith("#define NUM_SC "):
             NUM_SC = int(line[15:])
 
     # Assert that all the defines are read

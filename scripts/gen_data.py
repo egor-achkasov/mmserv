@@ -5,6 +5,7 @@ from util import read_defines, interleave
 import numpy as np
 from numpy.random import random, normal
 from sys import argv
+from os import path, makedirs
 
 if "--help" in argv:
     print("Usage: python scripts/gen_data.py [--txt] [--bin] [--s]")
@@ -62,6 +63,12 @@ sections = [
     Section("R", "data/R.txt", "3", 16, R.size * 2),
     Section("y", "data/y.txt", "3", 16, y.size * 2),
 ]
+
+# Create "data" directory if it does not exist
+if WRITE_DATA_BIN or WRITE_DATA_TXT:
+    data_dir = path.join(path.dirname(__file__), "..", "data") 
+    if not path.exists(data_dir):
+        makedirs(data_dir)
 
 if WRITE_DATA_TXT:
     for data, sec in zip(data_tuple, sections):

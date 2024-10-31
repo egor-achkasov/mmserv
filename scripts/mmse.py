@@ -3,6 +3,7 @@
 from util import read_defines, deinterleave, interleave
 
 import numpy as np
+from os import path, makedirs
 
 NUM_RX_ANT, NUM_TX_ANT, NUM_SC = read_defines()
 
@@ -40,5 +41,8 @@ y = np.moveaxis(y, 0, -1)
 
 # Cast the complex data to int16
 x_mmse_data = interleave(x_mmse)
-with open("out/x_mmse_python.bin", "wb") as f:
+out_dir = path.join(path.dirname(__file__), "..", "out")
+if not path.exists(out_dir):
+    makedirs(out_dir)
+with open(path.join(out_dir, "x_mmse_python.bin"), "wb") as f:
     f.write(x_mmse_data.tobytes())
