@@ -20,7 +20,7 @@ WRITE_DATA_BIN = "--bin" in argv
 WRITE_DATA_S = "--s" in argv
 
 NUM_RX_ANT, NUM_TX_ANT, NUM_SC = read_defines()
-NOISE_STD_DEVIATION = np.sqrt(.5) / 10  # noise standard deviation
+NOISE_STD_DEVIATION = np.sqrt(.5) / 100  # noise standard deviation
 
 # Transmitter signal
 x = random((NUM_TX_ANT, NUM_SC)) \
@@ -58,10 +58,10 @@ class Section:
 
 
 sections = [
-    Section("x", "data/x.txt", "3", 16, x.size * 2),
-    Section("H", "data/H.txt", "3", 16, H.size * 2),
-    Section("R", "data/R.txt", "3", 16, R.size * 2),
-    Section("y", "data/y.txt", "3", 16, y.size * 2),
+    Section("x", "data/x.txt", "3", 32, x.size * 2),
+    Section("H", "data/H.txt", "3", 32, H.size * 2),
+    Section("R", "data/R.txt", "3", 32, R.size * 2),
+    Section("y", "data/y.txt", "3", 32, y.size * 2),
 ]
 
 # Create "data" directory if it does not exist

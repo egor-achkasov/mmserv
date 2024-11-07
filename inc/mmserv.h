@@ -11,12 +11,9 @@
  * Typedefs
  */
 
-typedef int16_t data_t;
-typedef int32_t acc_t;
-
 typedef struct {
-    acc_t re;
-    acc_t im;
+    data_t re;
+    data_t im;
 } complex;
 
 /** Calculate MMSE estimation of x in y = H*x + n
@@ -54,7 +51,7 @@ complex cmake(IN data_t re, IN data_t im);
 complex cmul(IN complex a, IN complex b);
 
 /** Complex absolute value squared */
-acc_t cabs2(IN complex a);
+data_t cabs2(IN complex a);
 
 /** Complex addition */
 complex cadd(IN complex a, IN complex b);
@@ -70,7 +67,7 @@ complex cconj(IN complex a);
 complex cdiv(IN complex a, IN complex b);
 
 /** Square root of a natural number */
-data_t sqrt(IN acc_t x);
+data_t sqrt(IN data_t x);
 
 /** Complex root */
 complex csqrt(IN complex a);
@@ -103,6 +100,16 @@ void cmat_hermitian_transpose_TxTx(
 void cmatmul_TxRx_RxTx(
   IN complex A[NUM_TX_ANT][NUM_RX_ANT][NUM_SC],
   IN complex B[NUM_RX_ANT][NUM_TX_ANT][NUM_SC],
+  OUT complex result[NUM_TX_ANT][NUM_TX_ANT][NUM_SC]);
+
+/** Multiply two matrices A and B
+ * \param A input matrix. Shape [NUM_TX_ANT][NUM_TX_ANT][NUM_SC]
+ * \param B input matrix. Shape [NUM_TX_ANT][NUM_TX_ANT][NUM_SC]
+ * \param result output matrix. Shape [NUM_TX_ANT][NUM_TX_ANT][NUM_SC]
+ */
+void cmatmul_TxTx_TxTx(
+  IN complex A[NUM_TX_ANT][NUM_TX_ANT][NUM_SC],
+  IN complex B[NUM_TX_ANT][NUM_TX_ANT][NUM_SC],
   OUT complex result[NUM_TX_ANT][NUM_TX_ANT][NUM_SC]);
 
 /** Add two matrices A and B
@@ -180,7 +187,7 @@ void cbackwardsub_TxTx(
 void load_data(
   IN const char *file,
   IN size_t size,
-  OUT uint16_t *out);
+  OUT data_t *out);
 
 /** Save data to a binary file
  * \param file path to the file
@@ -188,7 +195,7 @@ void load_data(
  */
 void save_data(
   IN const char* file,
-  IN uint16_t x_mmse[NUM_TX_ANT][NUM_SC][2]);
+  IN data_t x_mmse[NUM_TX_ANT][NUM_SC][2]);
 
 
 #endif /* __MMSERV_H */

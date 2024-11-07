@@ -29,31 +29,31 @@ def read_defines():
 
 
 def interleave(data: np.ndarray) -> np.ndarray:
-    """Cast a np.complex64 array to np.int16 array.
+    """Cast a np.complex64 array to np.float32 array.
 
     Args:
         data (np.ndarray): The complex data to be casted. Dtype: np.complex64
 
     Returns:
-        np.ndarray: The interleaved data. Dtype: np.int16
+        np.ndarray: The interleaved data. Dtype: np.float32
     """
-    res = np.empty(2 * data.size, dtype=np.int16)
-    res[0::2] = data.flatten().real.astype(np.float16).view(np.int16)
-    res[1::2] = data.flatten().imag.astype(np.float16).view(np.int16)
+    res = np.empty(2 * data.size, dtype=np.float32)
+    res[0::2] = data.flatten().real.astype(np.float32)
+    res[1::2] = data.flatten().imag.astype(np.float32)
     return res
 
 
 def deinterleave(data: np.ndarray, shape: tuple) -> np.ndarray:
-    """Cast a np.int16 array to np.complex64 array.
+    """Cast a np.float32 array to np.complex64 array.
 
     Args:
-        data (np.ndarray): The interleaved data to be casted. Dtype: np.int16
+        data (np.ndarray): The interleaved data to be casted. Dtype: np.float32
         shape (tuple): The shape of the deinterleaved data.
 
     Returns:
         np.ndarray: The deinterleaved data. Dtype: np.complex64
     """
     res = np.empty(shape, np.complex64)
-    res.real = data[0::2].view(np.float16).astype(np.float32).reshape(shape)
-    res.imag = data[1::2].view(np.float16).astype(np.float32).reshape(shape)
+    res.real = data[0::2].reshape(shape)
+    res.imag = data[1::2].reshape(shape)
     return res

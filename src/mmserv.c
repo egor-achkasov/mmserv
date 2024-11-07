@@ -20,7 +20,7 @@ complex cmul(IN complex a, IN complex b)
   t.im = a.im * b.re + a.re * b.im;
   return t;	
 }
-acc_t cabs2(IN complex a)
+data_t cabs2(IN complex a)
 {
   return a.re * a.re + a.im * a.im;
 }
@@ -59,10 +59,10 @@ complex cdiv(IN complex a, IN complex b)
   return t;
 }
 
-data_t sqrt(IN acc_t x)
+data_t sqrt(IN data_t x)
 {
   if (x < 2) return x;
-  acc_t lo = 1, hi = x, mid;
+  data_t lo = 1, hi = x, mid;
   while (100 * lo * lo < x) lo *= 10;
   while (hi * hi / 100 > x) hi /= 10;
   for (int i = 0; i < 100; i++) {
@@ -91,9 +91,10 @@ void cmat_hermitian_transpose_RxTx(
   IN complex A[NUM_RX_ANT][NUM_TX_ANT][NUM_SC],
   OUT complex AH[NUM_TX_ANT][NUM_RX_ANT][NUM_SC])
 {
-  for (uint32_t i = 0; i < NUM_RX_ANT; ++i)
-    for (uint32_t j = 0; j < NUM_TX_ANT; ++j)
-      for (uint32_t k = 0; k < NUM_SC; ++k)
+  uint32_t i, j, k;
+  for (i = 0; i < NUM_RX_ANT; ++i)
+    for (j = 0; j < NUM_TX_ANT; ++j)
+      for (k = 0; k < NUM_SC; ++k)
         AH[i][j][k] = cconj(A[j][i][k]);
 }
 
@@ -101,9 +102,10 @@ void cmat_hermitian_transpose_TxTx(
   IN complex A[NUM_TX_ANT][NUM_TX_ANT][NUM_SC],
   OUT complex AH[NUM_TX_ANT][NUM_TX_ANT][NUM_SC])
 {
-  for (uint32_t i = 0; i < NUM_TX_ANT; ++i)
-    for (uint32_t j = 0; j < NUM_TX_ANT; ++j)
-      for (uint32_t k = 0; k < NUM_SC; ++k)
+  uint32_t i, j, k;
+  for (i = 0; i < NUM_TX_ANT; ++i)
+    for (j = 0; j < NUM_TX_ANT; ++j)
+      for (k = 0; k < NUM_SC; ++k)
         AH[i][j][k] = cconj(A[j][i][k]);
 }
 
@@ -112,10 +114,32 @@ void cmatmul_TxRx_RxTx(
   IN complex B[NUM_RX_ANT][NUM_TX_ANT][NUM_SC],
   OUT complex result[NUM_TX_ANT][NUM_TX_ANT][NUM_SC])
 {
-  for (uint32_t i = 0; i < NUM_TX_ANT; ++i)
-    for (uint32_t j = 0; j < NUM_TX_ANT; ++j)
-      for (uint32_t k = 0; k < NUM_RX_ANT; ++k)
-        for (uint32_t l = 0; l < NUM_SC; ++l)
+  uint32_t i, j, k, l;
+  for (i = 0; i < NUM_TX_ANT; ++i)
+    for (j = 0; j < NUM_TX_ANT; ++j)
+      for (k = 0; k < NUM_SC; ++k)
+        result[i][j][k] = cmake(0, 0);
+  for (i = 0; i < NUM_TX_ANT; ++i)
+    for (j = 0; j < NUM_TX_ANT; ++j)
+      for (k = 0; k < NUM_RX_ANT; ++k)
+        for (l = 0; l < NUM_SC; ++l)
+          result[i][j][l] = cadd(result[i][j][l], cmul(A[i][k][l], B[k][j][l]));
+}
+
+void cmatmul_TxTx_TxTx(
+  IN complex A[NUM_TX_ANT][NUM_TX_ANT][NUM_SC],
+  IN complex B[NUM_TX_ANT][NUM_TX_ANT][NUM_SC],
+  OUT complex result[NUM_TX_ANT][NUM_TX_ANT][NUM_SC])
+{
+  uint32_t i, j, k, l;
+  for (i = 0; i < NUM_TX_ANT; ++i)
+    for (j = 0; j < NUM_TX_ANT; ++j)
+      for (k = 0; k < NUM_SC; ++k)
+        result[i][j][k] = cmake(0, 0);
+  for (i = 0; i < NUM_TX_ANT; ++i)
+    for (j = 0; j < NUM_TX_ANT; ++j)
+      for (k = 0; k < NUM_TX_ANT; ++k)
+        for (l = 0; l < NUM_SC; ++l)
           result[i][j][l] = cadd(result[i][j][l], cmul(A[i][k][l], B[k][j][l]));
 }
 
@@ -124,9 +148,10 @@ void cmatadd_TxTx(
   IN complex B[NUM_TX_ANT][NUM_TX_ANT][NUM_SC],
   OUT complex result[NUM_TX_ANT][NUM_TX_ANT][NUM_SC])
 {
-  for (uint32_t i = 0; i < NUM_TX_ANT; ++i)
-    for (uint32_t j = 0; j < NUM_TX_ANT; ++j)
-      for (uint32_t k = 0; k < NUM_SC; ++k)
+  uint32_t i, j, k;
+  for (i = 0; i < NUM_TX_ANT; ++i)
+    for (j = 0; j < NUM_TX_ANT; ++j)
+      for (k = 0; k < NUM_SC; ++k)
         result[i][j][k] = cadd(A[i][j][k], B[i][j][k]);
 }
 
@@ -134,32 +159,25 @@ void ccholesky_TxTx(
   IN complex A[NUM_TX_ANT][NUM_TX_ANT][NUM_SC],
   OUT complex L[NUM_TX_ANT][NUM_TX_ANT][NUM_SC])
 {
+  uint32_t i, j, k, l;
+  complex sum;
   /* Init upper triangle with zeros */
-  for (uint32_t i = 0; i < NUM_TX_ANT; ++i)
-    for (uint32_t j = i+1; j < NUM_TX_ANT; ++j)
-      for (uint32_t k = 0; k < NUM_SC; ++k)
+  for (i = 0; i < NUM_TX_ANT; ++i)
+    for (j = i+1; j < NUM_TX_ANT; ++j)
+      for (k = 0; k < NUM_SC; ++k)
         L[i][j][k] = cmake(0, 0);
   /* Calculate diagonal and lower triangular entries */
-  for (uint32_t i = 0; i < NUM_TX_ANT; ++i)
-    for (uint32_t j = 0; j < i+1; ++j)
-      for (uint32_t k = 0; k < NUM_SC; ++k){
-        complex sum = {0, 0};
-        for (uint32_t l = 0; l < j; ++l)
+  for (i = 0; i < NUM_TX_ANT; ++i)
+    for (j = 0; j < i+1; ++j)
+      for (k = 0; k < NUM_SC; ++k){
+        sum.re = 0;
+        sum.im = 0;
+        for (l = 0; l < j; ++l)
           cadd_acc(sum, cmul(L[i][l][k], cconj(L[j][l][k])));
         if (i == j)
           L[i][j][k] = csqrt(csub(A[i][i][k], sum));
         else
           L[i][j][k] = cdiv(csub(A[i][j][k], sum), L[j][j][k]);
-
-        // TODO delete
-        #if 0
-        for (uint32_t i = 0; i < NUM_TX_ANT; ++i){
-          for (uint32_t j = 0; j < NUM_TX_ANT; ++j)
-            printf("(%6i, %6i) ", L[i][j][0].re, L[i][j][0].im);
-          printf("\n");
-        }
-        printf("\n");
-        #endif
       }
 }
 
@@ -168,47 +186,53 @@ void ccholesky_nosqrt_TxTx(
   OUT complex L[NUM_TX_ANT][NUM_TX_ANT][NUM_SC],
   OUT complex D[NUM_TX_ANT][NUM_TX_ANT][NUM_SC])
 {
+  uint32_t i, j, k, l;
+  complex sum, t;
   /* Init zeros in upper triangles of L and D */
-  for (uint32_t i = 0; i < NUM_TX_ANT; ++i)
-    for (uint32_t j = i+1; j < NUM_TX_ANT; ++j)
-      for (uint32_t k = 0; k < NUM_SC; ++k)
+  for (i = 0; i < NUM_TX_ANT; ++i)
+    for (j = i+1; j < NUM_TX_ANT; ++j)
+      for (k = 0; k < NUM_SC; ++k)
         D[i][j][k] = L[i][j][k] = cmake(0, 0);
   /* Init zeros in lower triangle of D */
-  for (uint32_t i = 0; i < NUM_TX_ANT; ++i)
-    for (uint32_t j = 0; j < i; ++j)
-      for (uint32_t k = 0; k < NUM_SC; ++k)
+  for (i = 0; i < NUM_TX_ANT; ++i)
+    for (j = 0; j < i; ++j)
+      for (k = 0; k < NUM_SC; ++k)
         D[i][j][k] = cmake(0, 0);
   /* Init ones in the diagonal of the result */
-  for (uint32_t i = 0; i < NUM_TX_ANT; ++i)
-    for (uint32_t k = 0; k < NUM_SC; ++k)
+  for (i = 0; i < NUM_TX_ANT; ++i)
+    for (k = 0; k < NUM_SC; ++k)
       L[i][i][k] = cmake(1, 0);
 
 
   /* Calculate the lower triangle of the result */
-  for (uint32_t i = 0; i < NUM_TX_ANT; ++i){
+  for (i = 0; i < NUM_TX_ANT; ++i){
     /* L_ij = (A_ij - \sum_{l=0}^{j-1} L_il L_jl^* D_k) / D_j */
-    for (uint32_t j = 0; j < i; ++j){
-      complex sum = {0, 0};
-      for (uint32_t l = 0; l < j; ++l)
-        for (uint32_t k = 0; k < NUM_SC; ++k){
+    for (j = 0; j < i; ++j){
+      sum.re = 0;
+      sum.im = 0;
+      for (l = 0; l < j; ++l)
+        for (k = 0; k < NUM_SC; ++k){
+          /* TODO there is one sum for all scs what leads to contamination. Fix that */
           complex t = cmul(L[i][l][k], cconj(L[j][l][k]));
           t = cmul(t, D[l][l][k]);
           cadd_acc(sum, t);
         }
-      for (uint32_t k = 0; k < NUM_SC; ++k){
+      for (k = 0; k < NUM_SC; ++k){
         L[i][j][k] = csub(A[i][j][k], sum);
         L[i][j][k] = cdiv(L[i][j][k], D[j][j][k]);
       }
     }
     /* D_i = A_ii - \sum_{j=0}^{i-1} L_ij L_ij^* D_j */
-    complex sum = {0, 0};
-    for (uint32_t j = 0; j < i; ++j)
-      for (uint32_t k = 0; k < NUM_SC; ++k){
-        complex t = cmul(L[i][j][k], cconj(L[i][j][k]));
+    sum.re = 0;
+    sum.im = 0;
+    for (j = 0; j < i; ++j)
+      for (k = 0; k < NUM_SC; ++k){
+        /* TODO there is one sum for all scs what leads to contamination. Fix that */
+        t = cmul(L[i][j][k], cconj(L[i][j][k]));
         t = cmul(t, D[j][j][k]);
         cadd_acc(sum, t);
       }
-    for (uint32_t k = 0; k < NUM_SC; ++k)
+    for (k = 0; k < NUM_SC; ++k)
       D[i][i][k] = csub(A[i][i][k], sum);
   }
 }
@@ -218,9 +242,13 @@ void cmatvecmul_TxRx(
   IN complex b[NUM_RX_ANT][NUM_SC],
   OUT complex result[NUM_TX_ANT][NUM_SC])
 {
-  for (uint32_t i = 0; i < NUM_TX_ANT; ++i)
-    for (uint32_t j = 0; j < NUM_RX_ANT; ++j)
-      for (uint32_t k = 0; k < NUM_SC; ++k)
+  uint32_t i, j, k;
+  for (i = 0; i < NUM_TX_ANT; ++i)
+    for (j = 0; j < NUM_SC; ++j)
+      result[i][j] = cmake(0., 0.);
+  for (i = 0; i < NUM_TX_ANT; ++i)
+    for (j = 0; j < NUM_RX_ANT; ++j)
+      for (k = 0; k < NUM_SC; ++k)
         result[i][k] = cadd(result[i][k], cmul(A[i][j][k], b[j][k]));
 }
 
@@ -229,10 +257,11 @@ void cforwardsub_TxTx(
   IN complex b[NUM_TX_ANT][NUM_SC],
   OUT complex result[NUM_TX_ANT][NUM_SC])
 {
-  for (uint32_t i = 0; i < NUM_TX_ANT; ++i)
-    for (uint32_t j = 0; j < NUM_SC; ++j){
+  uint32_t i, j, k;
+  for (i = 0; i < NUM_TX_ANT; ++i)
+    for (j = 0; j < NUM_SC; ++j){
       result[i][j] = b[i][j];
-      for (uint32_t k = 0; k < i; ++k)
+      for (k = 0; k < i; ++k)
         result[i][j] = csub(result[i][j], cmul(L[i][k][j], result[k][j]));
       result[i][j] = cdiv(result[i][j], L[i][i][j]);
     }
@@ -243,10 +272,11 @@ void cbackwardsub_TxTx(
   IN complex b[NUM_TX_ANT][NUM_SC],
   OUT complex result[NUM_TX_ANT][NUM_SC])
 {
-  for (uint32_t i = NUM_TX_ANT; i > 0; --i)
-    for (uint32_t j = 0; j < NUM_SC; ++j){
+  uint32_t i, j, k;
+  for (i = NUM_TX_ANT; i != (uint32_t)-1; --i)
+    for (j = 0; j < NUM_SC; ++j){
       result[i][j] = b[i][j];
-      for (uint32_t k = i+1; k < NUM_TX_ANT; ++k)
+      for (k = i+1; k < NUM_TX_ANT; ++k)
         result[i][j] = csub(result[i][j], cmul(U[i][k][j], result[k][j]));
       result[i][j] = cdiv(result[i][j], U[i][i][j]);
     }
@@ -259,7 +289,7 @@ void cbackwardsub_TxTx(
 void load_data(
   IN const char* file,
   IN size_t size,
-  OUT uint16_t *out)
+  OUT data_t *out)
 {
     FILE *fp = fopen(file, "rb");
     
@@ -267,7 +297,7 @@ void load_data(
         fprintf(stderr, "Error opening file %s.\n", file);
         exit(8);
     }
-    if ((fread(out, sizeof(uint16_t), size, fp)) != size) {
+    if ((fread(out, sizeof(data_t), size, fp)) != size) {
         fprintf(stderr, "Error reading file %s.\n", file);
         exit(8);
     }
@@ -277,7 +307,7 @@ void load_data(
 
 void save_data(
   IN const char* file,
-  IN uint16_t x_mmse[NUM_TX_ANT][NUM_SC][2])
+  IN data_t x_mmse[NUM_TX_ANT][NUM_SC][2])
 {
     FILE *fp = fopen(file, "wb");
     
@@ -285,7 +315,7 @@ void save_data(
         fprintf(stderr, "Error opening file %s.\n", file);
         exit(8);
     }
-    if ((fwrite(x_mmse, sizeof(uint16_t), NUM_TX_ANT*NUM_SC*2, fp)) != NUM_TX_ANT*NUM_SC*2) {
+    if ((fwrite(x_mmse, sizeof(data_t), NUM_TX_ANT*NUM_SC*2, fp)) != NUM_TX_ANT*NUM_SC*2) {
         fprintf(stderr, "Error writing file %s.\n", file);
         exit(8);
     }
@@ -341,7 +371,7 @@ void mmse_nosqrt(
   cmatadd_TxTx(HH_H, R, HH_H);
   /* L, D: (H^H*H + R) = L*D*L^H */
   complex L[NUM_TX_ANT][NUM_TX_ANT][NUM_SC];
-  complex D[NUM_TX_ANT][NUM_TX_ANT][NUM_SC];
+  complex D[NUM_TX_ANT][NUM_TX_ANT][NUM_SC]; /* TODO D should be a vector to save memory*/
   ccholesky_nosqrt_TxTx(HH_H, L, D);
   /* z: L*z = H^H*y */
   complex HHy[NUM_TX_ANT][NUM_SC];
@@ -349,8 +379,10 @@ void mmse_nosqrt(
   complex z[NUM_TX_ANT][NUM_SC];
   cforwardsub_TxTx(L, HHy, z);
   /* x_MMSE: L^H*x_MMSE = D^-1*z */
+  for (uint32_t i = 0; i != NUM_TX_ANT; ++i)
+    for (uint32_t j = 0; j != NUM_SC; ++j)
+      z[i][j] = cdiv(z[i][j], D[i][i][j]);
   complex LH[NUM_TX_ANT][NUM_TX_ANT][NUM_SC];
   cmat_hermitian_transpose_TxTx(L, LH);
-  cbackwardsub_TxTx(LH, z, x_MMSE);
-  cmatvecmul_TxRx(D, x_MMSE, x_MMSE);
+  cbackwardsub_TxTx(L, z, x_MMSE);
 }

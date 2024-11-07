@@ -10,9 +10,9 @@ from matplotlib import pyplot as plt
 NUM_RX_ANT, NUM_TX_ANT, NUM_SC = read_defines()
 
 with open("out/x_mmse.bin", "rb") as f:
-    x_mmse = deinterleave(np.fromfile(f, dtype=np.int16), (NUM_TX_ANT, NUM_SC))
+    x_mmse = deinterleave(np.fromfile(f, dtype=np.float32), (NUM_TX_ANT, NUM_SC))
 with open("data/x.bin", "rb") as f:
-    x = deinterleave(np.fromfile(f, dtype=np.int16), (NUM_TX_ANT, NUM_SC))
+    x = deinterleave(np.fromfile(f, dtype=np.float32), (NUM_TX_ANT, NUM_SC))
 
 for tx in range(NUM_TX_ANT):
     plt.scatter(x_mmse[tx].real,
