@@ -4,7 +4,7 @@ Forked from [gfdmrv](https://gitlab.vodafone-chair.org/viktor.razilov/gfdmrv) an
 
 ## Configuration
 
-Set up defines in `inc/mmserv.conf` before using the tool.
+Set up defines in `inc/define.h` before using the tool.
 - NUM_RX_ANT - number of recieving antennas
 - NUM_TX_ANT - number of transmitting antennas
 - NUM_SC - number of subcarriers 
