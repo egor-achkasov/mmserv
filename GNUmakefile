@@ -1,7 +1,7 @@
 CC = gcc
-CFLAGS = -Iinc -fno-builtin -Wall -Wextra
+CFLAGS = -Iinclude -fno-builtin -Wall -Wextra
 OBJDIR = obj
-BUILDDIR = build
+BUILDDIR = .
 
 SRC = $(wildcard src/*.c)
 OBJ = $(SRC:src/%.c=$(OBJDIR)/%.o)
@@ -31,7 +31,7 @@ $(OBJDIR)/main.o: main.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(OBJDIR)/* $(BUILDDIR)/*
+	rm -rf $(OBJDIR)/* $(BUILDDIR)/mmse
 
 .PHONY: all dbg clean
 

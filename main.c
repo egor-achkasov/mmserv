@@ -1,4 +1,4 @@
-#include "inc/mmserv.h"
+#include "include/mmserv.h"
 
 int main() {
   uint32_t i, j, k;
@@ -8,10 +8,13 @@ int main() {
   data_t H_raw[NUM_RX_ANT][NUM_TX_ANT][NUM_SC][2];  /* Channel */
   data_t R_raw[NUM_TX_ANT][NUM_TX_ANT][NUM_SC][2];  /* Noise covariance matrix */
   data_t y_raw[NUM_RX_ANT][NUM_SC][2];              /* Received signal */
-  load_data("data\\x.bin", NUM_TX_ANT*NUM_SC*2, x_raw);
-  load_data("data\\H.bin", NUM_RX_ANT*NUM_TX_ANT*NUM_SC*2, H_raw);
-  load_data("data\\R.bin", NUM_TX_ANT*NUM_RX_ANT*NUM_SC*2, R_raw);
-  load_data("data\\y.bin", NUM_RX_ANT*NUM_SC*2, y_raw);
+
+#ifndef ARA
+  load_data("data/x.bin", NUM_TX_ANT*NUM_SC*2, x_raw);
+  load_data("data/H.bin", NUM_RX_ANT*NUM_TX_ANT*NUM_SC*2, H_raw);
+  load_data("data/R.bin", NUM_TX_ANT*NUM_RX_ANT*NUM_SC*2, R_raw);
+  load_data("data/y.bin", NUM_RX_ANT*NUM_SC*2, y_raw);
+#endif
 
   /* Cast the data into complex data structures */
   complex x[NUM_TX_ANT][NUM_SC];

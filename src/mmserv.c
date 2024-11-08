@@ -1,4 +1,4 @@
-#include "mmserv.h"
+#include "../include/mmserv.h"
 
 #include <stdlib.h> // for exit
 
@@ -18,7 +18,7 @@ complex cmul(IN complex a, IN complex b)
   complex t;
   t.re = a.re * b.re - a.im * b.im;
   t.im = a.im * b.re + a.re * b.im;
-  return t;	
+  return t;
 }
 data_t cabs2(IN complex a)
 {
@@ -292,7 +292,7 @@ void load_data(
   OUT data_t *out)
 {
     FILE *fp = fopen(file, "rb");
-    
+
     if (fp == NULL) {
         fprintf(stderr, "Error opening file %s.\n", file);
         exit(8);
@@ -310,7 +310,7 @@ void save_data(
   IN data_t x_mmse[NUM_TX_ANT][NUM_SC][2])
 {
     FILE *fp = fopen(file, "wb");
-    
+
     if (fp == NULL) {
         fprintf(stderr, "Error opening file %s.\n", file);
         exit(8);

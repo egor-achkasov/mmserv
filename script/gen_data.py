@@ -17,7 +17,7 @@ if "--help" in argv:
 # Change these flags to control the output
 WRITE_DATA_TXT = "--txt" in argv
 WRITE_DATA_BIN = "--bin" in argv
-WRITE_DATA_S = "--s" in argv
+WRITE_DATA_S = "--s" in argv or len(argv) == 1
 
 NUM_RX_ANT, NUM_TX_ANT, NUM_SC = read_defines()
 NOISE_STD_DEVIATION = np.sqrt(.5) / 100  # noise standard deviation
@@ -58,15 +58,15 @@ class Section:
 
 
 sections = [
-    Section("x", "data/x.txt", "3", 32, x.size * 2),
-    Section("H", "data/H.txt", "3", 32, H.size * 2),
-    Section("R", "data/R.txt", "3", 32, R.size * 2),
-    Section("y", "data/y.txt", "3", 32, y.size * 2),
+    Section("x_raw", "data/x.txt", "3", 32, x.size * 2),
+    Section("H_raw", "data/H.txt", "3", 32, H.size * 2),
+    Section("R_raw", "data/R.txt", "3", 32, R.size * 2),
+    Section("y_raw", "data/y.txt", "3", 32, y.size * 2),
 ]
 
 # Create "data" directory if it does not exist
 if WRITE_DATA_BIN or WRITE_DATA_TXT:
-    data_dir = path.join(path.dirname(__file__), "..", "data") 
+    data_dir = path.join(path.dirname(__file__), "..", "data")
     if not path.exists(data_dir):
         makedirs(data_dir)
 
@@ -87,4 +87,10 @@ if WRITE_DATA_S:
         print(f".global {sec.name}")
         print(f"{sec.name}:")
         for sample in data:
-            print(f"    .hword 0x{sample.view(np.uint16):04x} // {sample}")
+            bs = sample.tobytes()
+            for i in range(0, len(bs), 4):
+                s = ""
+                for n in range(4):
+                    s += "%02x" % bs[i+3-n]
+                print("    .word 0x%s" % s)
+
