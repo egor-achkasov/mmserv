@@ -1,20 +1,14 @@
 #include "include/mmserv.h"
 
+#include "printf.h"
+
+extern data_t x_raw[NUM_TX_ANT][NUM_SC][2];              /* Transmitted signal */
+extern data_t H_raw[NUM_RX_ANT][NUM_TX_ANT][NUM_SC][2];  /* Channel */
+extern data_t R_raw[NUM_TX_ANT][NUM_TX_ANT][NUM_SC][2];  /* Noise covariance matrix */
+extern data_t y_raw[NUM_RX_ANT][NUM_SC][2];              /* Received signal */
+
 int main() {
   uint32_t i, j, k;
-
-  /* Load the data */
-  data_t x_raw[NUM_TX_ANT][NUM_SC][2];              /* Transmitted signal */
-  data_t H_raw[NUM_RX_ANT][NUM_TX_ANT][NUM_SC][2];  /* Channel */
-  data_t R_raw[NUM_TX_ANT][NUM_TX_ANT][NUM_SC][2];  /* Noise covariance matrix */
-  data_t y_raw[NUM_RX_ANT][NUM_SC][2];              /* Received signal */
-
-#ifndef ARA
-  load_data("data/x.bin", NUM_TX_ANT*NUM_SC*2, x_raw);
-  load_data("data/H.bin", NUM_RX_ANT*NUM_TX_ANT*NUM_SC*2, H_raw);
-  load_data("data/R.bin", NUM_TX_ANT*NUM_RX_ANT*NUM_SC*2, R_raw);
-  load_data("data/y.bin", NUM_RX_ANT*NUM_SC*2, y_raw);
-#endif
 
   /* Cast the data into complex data structures */
   complex x[NUM_TX_ANT][NUM_SC];
@@ -57,5 +51,7 @@ int main() {
     }
 
   /* Save the result */
-  save_data("out/x_mmse.bin", res);
+  for (i = 0; i < NUM_TX_ANT; ++i)
+    for (j = 0; j < NUM_SC; ++j)
+      printf("%f %f %f %f\n", i, j, res[i][j][0], res[i][j][1]);
 }

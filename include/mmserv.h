@@ -5,7 +5,6 @@
 
 #include <stdint.h> // for int16_t, int32_t
 #include <stddef.h> // for size_t
-#include <stdio.h>  // for FILE
 
 /*
  * Typedefs
@@ -174,28 +173,5 @@ void cbackwardsub_TxTx(
   IN complex U[NUM_TX_ANT][NUM_TX_ANT][NUM_SC],
   IN complex b[NUM_TX_ANT][NUM_SC],
   OUT complex result[NUM_TX_ANT][NUM_SC]);
-
-/*
- * IO
- */
-
-/** Load data from a binary file
- * \param file path to the file
- * \param size number of elements to read
- * \param out output array
- */
-void load_data(
-  IN const char *file,
-  IN size_t size,
-  OUT data_t *out);
-
-/** Save data to a binary file
- * \param file path to the file
- * \param x_mmse data to save
- */
-void save_data(
-  IN const char* file,
-  IN data_t x_mmse[NUM_TX_ANT][NUM_SC][2]);
-
 
 #endif /* __MMSERV_H */

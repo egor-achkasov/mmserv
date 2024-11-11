@@ -1,7 +1,5 @@
 #include "../include/mmserv.h"
 
-#include <stdlib.h> // for exit
-
 /*
  * Complex functions
  */
@@ -280,47 +278,6 @@ void cbackwardsub_TxTx(
         result[i][j] = csub(result[i][j], cmul(U[i][k][j], result[k][j]));
       result[i][j] = cdiv(result[i][j], U[i][i][j]);
     }
-}
-
-/*
- * IO
- */
-
-void load_data(
-  IN const char* file,
-  IN size_t size,
-  OUT data_t *out)
-{
-    FILE *fp = fopen(file, "rb");
-
-    if (fp == NULL) {
-        fprintf(stderr, "Error opening file %s.\n", file);
-        exit(8);
-    }
-    if ((fread(out, sizeof(data_t), size, fp)) != size) {
-        fprintf(stderr, "Error reading file %s.\n", file);
-        exit(8);
-    }
-
-    fclose(fp);
-}
-
-void save_data(
-  IN const char* file,
-  IN data_t x_mmse[NUM_TX_ANT][NUM_SC][2])
-{
-    FILE *fp = fopen(file, "wb");
-
-    if (fp == NULL) {
-        fprintf(stderr, "Error opening file %s.\n", file);
-        exit(8);
-    }
-    if ((fwrite(x_mmse, sizeof(data_t), NUM_TX_ANT*NUM_SC*2, fp)) != NUM_TX_ANT*NUM_SC*2) {
-        fprintf(stderr, "Error writing file %s.\n", file);
-        exit(8);
-    }
-
-    fclose(fp);
 }
 
 /*
