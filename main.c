@@ -1,14 +1,37 @@
 #include "include/mmserv.h"
 
-#include "printf.h"
+#include <stdio.h>
 
-extern data_t x_raw[NUM_TX_ANT][NUM_SC][2];              /* Transmitted signal */
-extern data_t H_raw[NUM_RX_ANT][NUM_TX_ANT][NUM_SC][2];  /* Channel */
-extern data_t R_raw[NUM_TX_ANT][NUM_TX_ANT][NUM_SC][2];  /* Noise covariance matrix */
-extern data_t y_raw[NUM_RX_ANT][NUM_SC][2];              /* Received signal */
+void load_data(
+  IN char* filepath,
+  IN size_t size,
+  OUT data_t* buff)
+{
+  FILE* f = fopen(filepath, "r");
+  if (!f) {
+    fprintf(stderr, "Error: could not open file %s\n", filepath);
+    exit(8);
+  }
+  if ((fread(buff, sizeof(data_t), size, f)) != size) {
+    fprintf(stderr, "Error: could not read file %s\n", filepath);
+    exit(8);
+  }
+  fclose(f);
+}
 
 int main() {
   uint32_t i, j, k;
+
+  /* Load the data */
+  data_t x_raw[NUM_TX_ANT][NUM_SC][2];              /* Transmitted signal */
+  data_t H_raw[NUM_RX_ANT][NUM_TX_ANT][NUM_SC][2];  /* Channel */
+  data_t R_raw[NUM_TX_ANT][NUM_TX_ANT][NUM_SC][2];  /* Noise covariance matrix */
+  data_t y_raw[NUM_RX_ANT][NUM_SC][2];              /* Received signal */
+
+  load_data("data/x.bin", NUM_TX_ANT * NUM_SC * 2, x_raw);
+  load_data("data/H.bin", NUM_RX_ANT * NUM_TX_ANT * NUM_SC * 2, H_raw);
+  load_data("data/R.bin", NUM_TX_ANT * NUM_TX_ANT * NUM_SC * 2, R_raw);
+  load_data("data/y.bin", NUM_RX_ANT * NUM_SC * 2, y_raw);
 
   /* Cast the data into complex data structures */
   complex x[NUM_TX_ANT][NUM_SC];
