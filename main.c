@@ -52,16 +52,4 @@ int main() {
       res[i][j][0] = x_MMSE[i][j].re;
       res[i][j][1] = x_MMSE[i][j].im;
     }
-
-  /* Save the result */
-  FILE* f = fopen("out/x_mmse.bin", "w");
-  if (!f) {
-    fprintf(stderr, "Error: could not open file out/x_MMSE.bin\n");
-    exit(8);
-  }
-  if ((fwrite(res, sizeof(data_t), NUM_TX_ANT * NUM_SC * 2, f)) != NUM_TX_ANT * NUM_SC * 2) {
-    fprintf(stderr, "Error: could not write file out/x_MMSE.bin\n");
-    exit(8);
-  }
-  fclose(f);
 }
