@@ -174,4 +174,13 @@ void cbackwardsub_TxTx(
   IN complex b[NUM_TX_ANT][NUM_SC],
   OUT complex result[NUM_TX_ANT][NUM_SC]);
 
+/** Calculate mean squared error between the original x and the estimated x
+ * \param x original x. Shape [NUM_TX_ANT][NUM_SC]
+ * \param x_MMSE estimated x. Shape [NUM_TX_ANT][NUM_SC]
+ * \return mean squared error
+ */
+acc_t mse(
+  IN complex x[NUM_TX_ANT][NUM_SC],
+  IN complex x_MMSE[NUM_TX_ANT][NUM_SC]);
+
 #endif /* __MMSERV_H */

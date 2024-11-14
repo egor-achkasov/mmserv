@@ -42,6 +42,9 @@ int main() {
   complex x_MMSE[NUM_TX_ANT][NUM_SC];
   mmse(H, y, R, x_MMSE);
 
+  /* Print MSE */
+  printf("%f\n", mse(x, x_MMSE));
+
   /* Interleave the result */
   data_t res[NUM_TX_ANT][NUM_SC][2];
   for (i = 0; i < NUM_TX_ANT; ++i)
@@ -51,7 +54,14 @@ int main() {
     }
 
   /* Save the result */
-  for (i = 0; i < NUM_TX_ANT; ++i)
-    for (j = 0; j < NUM_SC; ++j)
-      printf("%f %f %f %f\n", i, j, res[i][j][0], res[i][j][1]);
+  FILE* f = fopen("out/x_mmse.bin", "w");
+  if (!f) {
+    fprintf(stderr, "Error: could not open file out/x_MMSE.bin\n");
+    exit(8);
+  }
+  if ((fwrite(res, sizeof(data_t), NUM_TX_ANT * NUM_SC * 2, f)) != NUM_TX_ANT * NUM_SC * 2) {
+    fprintf(stderr, "Error: could not write file out/x_MMSE.bin\n");
+    exit(8);
+  }
+  fclose(f);
 }
