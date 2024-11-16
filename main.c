@@ -44,12 +44,4 @@ int main() {
 
   /* Print MSE */
   printf("%f\n", mse(x, x_MMSE));
-
-  /* Interleave the result */
-  data_t res[NUM_TX_ANT][NUM_SC][2];
-  for (i = 0; i < NUM_TX_ANT; ++i)
-    for (j = 0; j < NUM_SC; ++j){
-      res[i][j][0] = x_MMSE[i][j].re;
-      res[i][j][1] = x_MMSE[i][j].im;
-    }
 }
