@@ -59,13 +59,21 @@ complex cdiv(IN complex a, IN complex b)
 
 data_t sqrt(IN data_t x)
 {
-  if (x < 2) return x;
-  data_t lo = 1, hi = x, mid;
-  while (100 * lo * lo < x) lo *= 10;
-  while (hi * hi / 100 > x) hi /= 10;
-  for (int i = 0; i < 100; i++) {
+  data_t lo, hi, mid;
+  data_t eps = 1e-6;
+  if (x < eps)
+    return 0;
+
+  if (x < 1.){
+    lo = x;
+    hi = 1;
+  }
+  else{
+    lo = 1;
+    hi = x;
+  }
+  while (hi - lo > eps){
     mid = (lo + hi) / 2;
-    if (mid * mid == x) return mid;
     if (mid * mid > x) hi = mid;
     else lo = mid;
   }
@@ -73,11 +81,18 @@ data_t sqrt(IN data_t x)
 }
 complex csqrt(IN complex a)
 {
+  if (a.im == 0){
+    if (a.re < 0)
+      return cmake(0, sqrt(-a.re));
+    else
+      return cmake(sqrt(a.re), 0);
+  }
   data_t length = sqrt(cabs2(a));
   complex res;
   res.re = sqrt((length + a.re) / 2);
   res.im = sqrt((length - a.re) / 2);
-  res.im *= (a.im > 0) - (a.im < 0);
+  if (a.im < 0)
+    res.re = -res.re;
   return res;
 }
 
@@ -168,14 +183,13 @@ void ccholesky_TxTx(
   for (i = 0; i < NUM_TX_ANT; ++i)
     for (j = 0; j < i+1; ++j)
       for (k = 0; k < NUM_SC; ++k){
-        sum.re = 0;
-        sum.im = 0;
+        sum = A[i][j][k];
         for (l = 0; l < j; ++l)
-          cadd_acc(sum, cmul(L[i][l][k], cconj(L[j][l][k])));
+          sum = csub(sum, cmul(L[i][l][k], cconj(L[j][l][k])));
         if (i == j)
-          L[i][j][k] = csqrt(csub(A[i][i][k], sum));
+          L[i][j][k] = csqrt(sum);
         else
-          L[i][j][k] = cdiv(csub(A[i][j][k], sum), L[j][j][k]);
+          L[i][j][k] = cdiv(sum, L[j][j][k]);
       }
 }
 
