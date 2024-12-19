@@ -1,5 +1,25 @@
 #include "../include/mmserv.h"
 
+#include "../../common/rivec/vector_defines.h"
+#include "riscv_vector.h"
+
+#ifdef DEBUG
+#include "../../common/runtime.h"
+#include "../../common/util.h"
+#include "printf.h"
+#include <stdio.h>
+
+#define TIME(msg, func, ...) \
+  start_timer(); \
+  func(__VA_ARGS__); \
+  stop_timer(); \
+  printf(msg, get_timer());
+
+#else
+#define TIME(msg, func, ...) func(__VA_ARGS__);
+
+#endif
+
 /*
  * Complex functions
  */
@@ -179,6 +199,7 @@ void ccholesky_TxTx(
     for (j = i+1; j < NUM_TX_ANT; ++j)
       for (k = 0; k < NUM_SC; ++k)
         L[i][j][k] = cmake(0, 0);
+
   /* Calculate diagonal and lower triangular entries */
   for (i = 0; i < NUM_TX_ANT; ++i)
     for (j = 0; j < i+1; ++j)
@@ -215,7 +236,6 @@ void ccholesky_nosqrt_TxTx(
     for (k = 0; k < NUM_SC; ++k)
       L[i][i][k] = cmake(1, 0);
 
-
   /* Calculate the lower triangle of the result */
   for (i = 0; i < NUM_TX_ANT; ++i){
     /* L_ij = (A_ij - \sum_{l=0}^{j-1} L_il L_jl^* D_k) / D_j */
@@ -225,7 +245,7 @@ void ccholesky_nosqrt_TxTx(
       for (l = 0; l < j; ++l)
         for (k = 0; k < NUM_SC; ++k){
           /* TODO there is one sum for all scs what leads to contamination. Fix that */
-          complex t = cmul(L[i][l][k], cconj(L[j][l][k]));
+          t = cmul(L[i][l][k], cconj(L[j][l][k]));
           t = cmul(t, D[l][l][k]);
           cadd_acc(sum, t);
         }
@@ -304,26 +324,51 @@ void mmse(
   IN complex R[NUM_TX_ANT][NUM_TX_ANT][NUM_SC],
   OUT complex x_MMSE[NUM_TX_ANT][NUM_SC])
 {
-  /* H^H */
   complex HH[NUM_TX_ANT][NUM_RX_ANT][NUM_SC];
-  cmat_hermitian_transpose_RxTx(H, HH);
-  /* H^H*H */
   complex HH_H[NUM_TX_ANT][NUM_TX_ANT][NUM_SC];
-  cmatmul_TxRx_RxTx(HH, H, HH_H);
-  /* H^H*H + R */
-  cmatadd_TxTx(HH_H, R, HH_H);
-  /* L: (H^H*H + R) = L*L^H */
   complex L[NUM_TX_ANT][NUM_TX_ANT][NUM_SC];
-  ccholesky_TxTx(HH_H, L);
-  /* z: L*z = H^H*y */
   complex HHy[NUM_TX_ANT][NUM_SC];
-  cmatvecmul_TxRx(HH, y, HHy);
   complex z[NUM_TX_ANT][NUM_SC];
-  cforwardsub_TxTx(L, HHy, z);
-  /* x_MMSE: L^H*x_MMSE = z */
   complex LH[NUM_TX_ANT][NUM_TX_ANT][NUM_SC];
-  cmat_hermitian_transpose_TxTx(L, LH);
-  cbackwardsub_TxTx(LH, z, x_MMSE);
+
+  /* H^H */
+  TIME(
+    "Hermitian transpose (RxTx): %ld\n",
+    cmat_hermitian_transpose_RxTx,
+    H, HH);
+  /* H^H*H */
+  TIME(
+    "Matmul (TxRx x RxTx): %ld\n",
+    cmatmul_TxRx_RxTx,
+    HH, H, HH_H);
+  /* H^H*H + R */
+  TIME(
+    "Matadd (TxTx + TxTx): %ld\n",
+    cmatadd_TxTx,
+    HH_H, R, HH_H);
+  /* L: (H^H*H + R) = L*L^H */
+  TIME(
+    "Cholesky (TxTx): %ld\n",
+    ccholesky_TxTx,
+    HH_H, L);
+  /* z: L*z = H^H*y */
+  TIME(
+    "Matrix-vector multiplication (TxRx x Rx): %ld\n",
+    cmatvecmul_TxRx,
+    HH, y, HHy);
+  TIME(
+    "Forward substitution (TxTx): %ld\n",
+    cforwardsub_TxTx,
+    L, HHy, z);
+  /* x_MMSE: L^H*x_MMSE = z */
+  TIME(
+    "Hermitian transpose (TxTx): %ld\n",
+    cmat_hermitian_transpose_TxTx,
+    L, LH);
+  TIME(
+    "Backward substitution (TxTx): %ld\n",
+    cbackwardsub_TxTx,
+    LH, z, x_MMSE);
 }
 
 void mmse_nosqrt(
@@ -334,28 +379,55 @@ void mmse_nosqrt(
 {
   /* H^H */
   complex HH[NUM_TX_ANT][NUM_RX_ANT][NUM_SC];
-  cmat_hermitian_transpose_RxTx(H, HH);
-  /* H^H*H */
   complex HH_H[NUM_TX_ANT][NUM_TX_ANT][NUM_SC];
-  cmatmul_TxRx_RxTx(HH, H, HH_H);
-  /* H^H*H + R */
-  cmatadd_TxTx(HH_H, R, HH_H);
-  /* L, D: (H^H*H + R) = L*D*L^H */
   complex L[NUM_TX_ANT][NUM_TX_ANT][NUM_SC];
-  complex D[NUM_TX_ANT][NUM_TX_ANT][NUM_SC]; /* TODO D should be a vector to save memory*/
-  ccholesky_nosqrt_TxTx(HH_H, L, D);
-  /* z: L*z = H^H*y */
+  /* TODO D should be a vector to save memory */
+  complex D[NUM_TX_ANT][NUM_TX_ANT][NUM_SC];
   complex HHy[NUM_TX_ANT][NUM_SC];
-  cmatvecmul_TxRx(HH, y, HHy);
   complex z[NUM_TX_ANT][NUM_SC];
-  cforwardsub_TxTx(L, HHy, z);
+  complex LH[NUM_TX_ANT][NUM_TX_ANT][NUM_SC];
+
+  TIME(
+    "Hermitian transpose (RxTx): %ld\n",
+    cmat_hermitian_transpose_RxTx,
+    H, HH);
+  TIME(
+    "Matmul (TxRx x RxTx): %ld\n",
+    cmatmul_TxRx_RxTx,
+    HH, H, HH_H);
+  TIME(
+    "Matadd (TxTx + TxTx): %ld\n",
+    cmatadd_TxTx,
+    HH_H, R, HH_H);
+  /* L, D: (H^H*H + R) = L*D*L^H */
+  TIME(
+    "Cholesky nosqrt (TxTx): %ld\n",
+    ccholesky_nosqrt_TxTx,
+    HH_H, L, D);
+  /* z: L*z = H^H*y */
+  TIME(
+    "Matrix-vector multiplication (TxRx x Rx): %ld\n",
+    cmatvecmul_TxRx,
+    HH, y, HHy);
+  TIME(
+    "Forward substitution (TxTx): %ld\n",
+    cforwardsub_TxTx,
+    L, HHy, z);
   /* x_MMSE: L^H*x_MMSE = D^-1*z */
+  start_timer();
   for (uint32_t i = 0; i != NUM_TX_ANT; ++i)
     for (uint32_t j = 0; j != NUM_SC; ++j)
       z[i][j] = cdiv(z[i][j], D[i][i][j]);
-  complex LH[NUM_TX_ANT][NUM_TX_ANT][NUM_SC];
-  cmat_hermitian_transpose_TxTx(L, LH);
-  cbackwardsub_TxTx(L, z, x_MMSE);
+  stop_timer();
+  printf("Division (TxTx): %ld\n", get_timer());
+  TIME(
+    "Hermitian transpose (TxTx): %ld\n",
+    cmat_hermitian_transpose_TxTx,
+    L, LH);
+  TIME(
+    "Backward substitution (TxTx): %ld\n",
+    cbackwardsub_TxTx,
+    LH, z, x_MMSE);
 }
 
 acc_t mse(
