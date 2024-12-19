@@ -58,10 +58,10 @@ class Section:
 
 
 sections = [
-    Section("x_raw", "data/x.txt", "3", 32, x.size * 2),
-    Section("H_raw", "data/H.txt", "3", 32, H.size * 2),
-    Section("R_raw", "data/R.txt", "3", 32, R.size * 2),
-    Section("y_raw", "data/y.txt", "3", 32, y.size * 2),
+    Section("x", "data/x.txt", "3", 32, x.size * 2),
+    Section("H", "data/H.txt", "3", 32, H.size * 2),
+    Section("R", "data/R.txt", "3", 32, R.size * 2),
+    Section("y", "data/y.txt", "3", 32, y.size * 2),
 ]
 
 # Create "data" directory if it does not exist
