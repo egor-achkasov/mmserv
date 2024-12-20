@@ -1,8 +1,5 @@
 #include "../include/mmserv.h"
 
-#include "../../common/rivec/vector_defines.h"
-#include "riscv_vector.h"
-
 /* Profiling */
 #ifdef DEBUG
 #include <stdio.h>
@@ -446,17 +443,6 @@ void mmse_nosqrt(
     "Backward substitution (TxTx): %ld\n",
     cbackwardsub_TxTx,
     LH, z, x_MMSE);
-}
-
-acc_t mse(
-  IN complex x[NUM_TX_ANT][NUM_SC],
-  IN complex x_MMSE[NUM_TX_ANT][NUM_SC])
-{
-  acc_t sum = 0;
-  for (uint32_t i = 0; i != NUM_TX_ANT; ++i)
-    for (uint32_t j = 0; j != NUM_SC; ++j)
-      sum += cabs2(csub(x[i][j], x_MMSE[i][j]));
-  return sum / (NUM_TX_ANT * NUM_SC);
 }
 
 acc_t mse(

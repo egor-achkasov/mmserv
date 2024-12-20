@@ -1,6 +1,7 @@
 #include "include/mmserv.h"
 
-#include <stdio.h>
+#include <stdio.h>  /* for printf */
+#include <stdlib.h> /* for exit */
 
 void load_data(
   IN char* filepath,
@@ -20,8 +21,6 @@ void load_data(
 }
 
 int main() {
-  uint32_t i, j, k;
-
   /* Load the data */
   complex x[NUM_TX_ANT][NUM_SC];              /* Transmitted signal */
   complex H[NUM_RX_ANT][NUM_TX_ANT][NUM_SC];  /* Channel */
