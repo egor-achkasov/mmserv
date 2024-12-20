@@ -7,6 +7,8 @@
 
 #define NOSQRT 1
 
+#define DEBUG
+
 #define IN
 #define OUT
 
