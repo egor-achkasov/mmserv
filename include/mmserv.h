@@ -11,8 +11,8 @@
  */
 
 typedef struct {
-    data_t re;
-    data_t im;
+  data_t re;
+  data_t im;
 } complex;
 
 /** Calculate MMSE estimation of x in y = H*x + n

@@ -9,11 +9,11 @@ OBJ += $(OBJDIR)/main.o
 
 TARGET = $(BUILDDIR)/mmse
 
+all: $(TARGET)
+
 # Debug target
 dbg: CFLAGS += -g
 dbg: $(TARGET)
-
-all: $(TARGET)
 
 # Compile the elf
 $(TARGET): $(OBJ)
