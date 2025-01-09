@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-from util import read_defines, interleave
+from util import read_defines
 
 import numpy as np
 from numpy.random import random, normal
@@ -35,16 +35,15 @@ n = normal(0, NOISE_STD_DEVIATION, (NUM_RX_ANT, NUM_SC)) \
     + 1.j * normal(0, NOISE_STD_DEVIATION, (NUM_RX_ANT, NUM_SC))
 # Received signal
 y = np.einsum("ijk,jk->ik", H, x) + n
-
 # Noise covariance matrix
 R = np.eye(NUM_TX_ANT, NUM_TX_ANT, dtype=np.complex64) * NOISE_STD_DEVIATION**2
 
-# Cast the complex data to int16
-x_data = interleave(x)
-H_data = interleave(H)
-R_data = interleave(R)
-y_data = interleave(y)
-data_tuple = (x_data, H_data, R_data, y_data)
+data_tuple = (
+    x.real.astype(np.float32), x.imag.astype(np.float32),
+    H.real.astype(np.float32), H.imag.astype(np.float32),
+    R.real.astype(np.float32), R.imag.astype(np.float32),
+    y.real.astype(np.float32), y.imag.astype(np.float32)
+)
 
 
 class Section:
@@ -58,10 +57,14 @@ class Section:
 
 
 sections = [
-    Section("x", "data/x.txt", "3", 32, x.size * 2),
-    Section("H", "data/H.txt", "3", 32, H.size * 2),
-    Section("R", "data/R.txt", "3", 32, R.size * 2),
-    Section("y", "data/y.txt", "3", 32, y.size * 2),
+    Section("x_re", "data/x_re.txt", "3", 32, x.size),
+    Section("x_im", "data/x_im.txt", "3", 32, x.size),
+    Section("H_re", "data/H_re.txt", "3", 32, H.size),
+    Section("H_im", "data/H_im.txt", "3", 32, H.size),
+    Section("R_re", "data/R_re.txt", "3", 32, R.size),
+    Section("R_im", "data/R_im.txt", "3", 32, R.size),
+    Section("y_re", "data/y_re.txt", "3", 32, y.size),
+    Section("y_im", "data/y_im.txt", "3", 32, y.size),
 ]
 
 # Create "data" directory if it does not exist
@@ -93,4 +96,3 @@ if WRITE_DATA_S:
                 for n in range(4):
                     s += "%02x" % bs[i+3-n]
                 print("    .word 0x%s" % s)
-

@@ -28,32 +28,26 @@ def read_defines():
     return NUM_RX_ANT, NUM_TX_ANT, NUM_SC
 
 
-def interleave(data: np.ndarray) -> np.ndarray:
-    """Cast a np.complex64 array to np.float32 array.
-
-    Args:
-        data (np.ndarray): The complex data to be casted. Dtype: np.complex64
-
-    Returns:
-        np.ndarray: The interleaved data. Dtype: np.float32
-    """
-    res = np.empty(2 * data.size, dtype=np.float32)
-    res[0::2] = data.flatten().real.astype(np.float32)
-    res[1::2] = data.flatten().imag.astype(np.float32)
-    return res
-
-
-def deinterleave(data: np.ndarray, shape: tuple) -> np.ndarray:
-    """Cast a np.float32 array to np.complex64 array.
-
-    Args:
-        data (np.ndarray): The interleaved data to be casted. Dtype: np.float32
-        shape (tuple): The shape of the deinterleaved data.
+def load_xHRy(NUM_RX_ANT, NUM_TX_ANT, NUM_SC) -> tuple:
+    """Load x, H, R and y from the data files.
+    Assumes that the following files are present in the data directory:
+    x_re.bin, x_im.bin, H_re.bin, H_im.bin, R_re.bin, R_im.bin, y_re.bin, y_im.bin
+    and they contain float32 data of the appropriate sizes.
 
     Returns:
-        np.ndarray: The deinterleaved data. Dtype: np.complex64
+        tuple: x, H, R, y
     """
-    res = np.empty(shape, np.complex64)
-    res.real = data[0::2].reshape(shape)
-    res.imag = data[1::2].reshape(shape)
-    return res
+    x = np.fromfile("data/x_re.bin", dtype=np.float32)
+    x = x + 1j*np.fromfile("data/x_im.bin", dtype=np.float32)
+    x = x.reshape((NUM_TX_ANT, NUM_SC))
+    H = np.fromfile("data/H_re.bin", dtype=np.float32)
+    H = H + 1j*np.fromfile("data/H_im.bin", dtype=np.float32)
+    H = H.reshape((NUM_RX_ANT, NUM_TX_ANT, NUM_SC))
+    R = np.fromfile("data/R_re.bin", dtype=np.float32)
+    R = R + 1j*np.fromfile("data/R_im.bin", dtype=np.float32)
+    R = R.reshape((NUM_TX_ANT, NUM_TX_ANT, NUM_SC))
+    y = np.fromfile("data/y_re.bin", dtype=np.float32)
+    y = y + 1j*np.fromfile("data/y_im.bin", dtype=np.float32)
+    y = y.reshape((NUM_RX_ANT, NUM_SC))
+
+    return x, H, R, y
