@@ -21,16 +21,54 @@ void load_data(
 }
 
 int main() {
+  size_t i, j, k;
+
   /* Load the data */
   complex x[NUM_TX_ANT][NUM_SC];              /* Transmitted signal */
   complex H[NUM_RX_ANT][NUM_TX_ANT][NUM_SC];  /* Channel */
   complex R[NUM_TX_ANT][NUM_TX_ANT][NUM_SC];  /* Noise covariance matrix */
   complex y[NUM_RX_ANT][NUM_SC];              /* Received signal */
 
-  load_data("data/x.bin", NUM_TX_ANT * NUM_SC * 2, x);
-  load_data("data/H.bin", NUM_RX_ANT * NUM_TX_ANT * NUM_SC * 2, H);
-  load_data("data/R.bin", NUM_TX_ANT * NUM_TX_ANT * NUM_SC * 2, R);
-  load_data("data/y.bin", NUM_RX_ANT * NUM_SC * 2, y);
+  data_t x_t[NUM_TX_ANT][NUM_SC];
+  load_data("data/x_re.bin", NUM_TX_ANT * NUM_SC, x_t);
+  for (i = 0; i < NUM_TX_ANT; i++)
+    for (j = 0; j < NUM_SC; j++)
+      x[i][j].re = x_t[i][j];
+  load_data("data/x_im.bin", NUM_TX_ANT * NUM_SC, x_t);
+  for (i = 0; i < NUM_TX_ANT; i++)
+    for (j = 0; j < NUM_SC; j++)
+      x[i][j].im = x_t[i][j];
+  data_t H_t[NUM_RX_ANT][NUM_TX_ANT][NUM_SC];
+  load_data("data/H_re.bin", NUM_RX_ANT * NUM_TX_ANT * NUM_SC, H_t);
+  for (i = 0; i < NUM_RX_ANT; i++)
+    for (j = 0; j < NUM_TX_ANT; j++)
+      for (k = 0; k < NUM_SC; k++)
+        H[i][j][k].re = H_t[i][j][k];
+  load_data("data/H_im.bin", NUM_RX_ANT * NUM_TX_ANT * NUM_SC, H_t);
+  for (i = 0; i < NUM_RX_ANT; i++)
+    for (j = 0; j < NUM_TX_ANT; j++)
+      for (k = 0; k < NUM_SC; k++)
+        H[i][j][k].im = H_t[i][j][k];
+  data_t R_t[NUM_TX_ANT][NUM_TX_ANT][NUM_SC];
+  load_data("data/R_re.bin", NUM_TX_ANT * NUM_TX_ANT * NUM_SC, R_t);
+  for (i = 0; i < NUM_TX_ANT; i++)
+    for (j = 0; j < NUM_TX_ANT; j++)
+      for (k = 0; k < NUM_SC; k++)
+        R[i][j][k].re = R_t[i][j][k];
+  load_data("data/R_im.bin", NUM_TX_ANT * NUM_TX_ANT * NUM_SC, R_t);
+  for (i = 0; i < NUM_TX_ANT; i++)
+    for (j = 0; j < NUM_TX_ANT; j++)
+      for (k = 0; k < NUM_SC; k++)
+        R[i][j][k].im = R_t[i][j][k];
+  data_t y_t[NUM_RX_ANT][NUM_SC];
+  load_data("data/y_re.bin", NUM_RX_ANT * NUM_SC, y_t);
+  for (i = 0; i < NUM_RX_ANT; i++)
+    for (j = 0; j < NUM_SC; j++)
+      y[i][j].re = y_t[i][j];
+  load_data("data/y_im.bin", NUM_RX_ANT * NUM_SC, y_t);
+  for (i = 0; i < NUM_RX_ANT; i++)
+    for (j = 0; j < NUM_SC; j++)
+      y[i][j].im = y_t[i][j];
 
   /* Calculate the MMSE approximation */
   complex x_MMSE[NUM_TX_ANT][NUM_SC];
