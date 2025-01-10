@@ -189,12 +189,26 @@ void cmatadd_TxTx(
   IN vcomplex *B,
   OUT vcomplex *result)
 {
-  size_t off_ijk = 0, off_result = 0;
-  for (;off_ijk != NUM_TX_ANT * NUM_TX_ANT * NUM_SC;) {
-    result->re[off_result] = A->re[off_ijk] + B->re[off_ijk];
-    result->im[off_result] = A->im[off_ijk] + B->im[off_ijk];
-    ++off_ijk;
-    ++off_result;
+  vfloat32m1_t vA, vB, vresult;
+  size_t vl, sz = NUM_TX_ANT * NUM_TX_ANT * NUM_SC;
+  size_t off = 0;
+  while (sz > 0) {
+    vl = vsetvl_e32m1(sz);
+
+    /* real part */
+    vA = vle32_v_f32m1(&A->re[off], vl);
+    vB = vle32_v_f32m1(&B->re[off], vl);
+    vresult = vfadd_vv_f32m1(vA, vB, vl);
+    vse32_v_f32m1(&result->re[off], vresult, vl);
+
+    /* imaginary part */
+    vA = vle32_v_f32m1(&A->im[off], vl);
+    vB = vle32_v_f32m1(&B->im[off], vl);
+    vresult = vfadd_vv_f32m1(vA, vB, vl);
+    vse32_v_f32m1(&result->im[off], vresult, vl);
+
+    sz -= vl;
+    off += vl;
   }
 }
 
