@@ -1,30 +1,14 @@
 #include "../include/mmserv.h"
 
+#include "../../common/rivec/vector_defines.h"
+#include "riscv_vector.h"
+
 #include <stddef.h> /* for size_t */
 
 #ifdef DEBUG
-#include <stdint.h> /* for uint64_t */
-#include <stdio.h> /* for printf */
-
-#ifdef _WIN32
-#include <intrin.h>
-#else
-#include <x86intrin.h>
-#endif
-
-static uint64_t start = 0, end = 0;
-void start_timer()
-{
-  start = __rdtsc();
-}
-void stop_timer()
-{
-  end = __rdtsc();
-}
-unsigned long long get_timer()
-{
-  return end - start;
-}
+#include "../../common/runtime.h"
+#include "../../common/util.h"
+#include "printf.h"
 
 #define TIME(msg, func, ...) \
   start_timer(); \

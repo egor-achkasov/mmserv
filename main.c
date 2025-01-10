@@ -1,26 +1,6 @@
 #include "include/mmserv.h"
 
-#include <stdio.h> /* for printf */
-
-/* Import a binary file */
-#define IMPORT_BIN(sect, file, sym) asm (\
-    ".section " #sect "\n"   /* Change section */\
-    ".balign 4\n"            /* Word alignment */\
-    ".global " #sym "\n"     /* Export the object address */\
-    #sym ":\n"               /* Define the object label */\
-    ".incbin \"" file "\"\n" /* Import the file */\
-    ".balign 4\n"            /* Word alignment */\
-    ".section \".text\"\n")  /* Restore section */
-
-/* Import the data */
-IMPORT_BIN(".rodata", "data/x_re.bin", x_re);
-IMPORT_BIN(".rodata", "data/x_im.bin", x_im);
-IMPORT_BIN(".rodata", "data/H_re.bin", H_re);
-IMPORT_BIN(".rodata", "data/H_im.bin", H_im);
-IMPORT_BIN(".rodata", "data/R_re.bin", R_re);
-IMPORT_BIN(".rodata", "data/R_im.bin", R_im);
-IMPORT_BIN(".rodata", "data/y_re.bin", y_re);
-IMPORT_BIN(".rodata", "data/y_im.bin", y_im);
+#include "../common/printf.h"
 
 /* Transmitted signal */
 extern data_t x_re[NUM_TX_ANT][NUM_SC];
