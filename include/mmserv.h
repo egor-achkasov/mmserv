@@ -3,17 +3,16 @@
 
 #include "define.h"
 
-#include <stdint.h> // for int16_t, int32_t
-#include <stddef.h> // for size_t
+#include <stddef.h> /* for size_t */
 
 /*
  * Typedefs
  */
 
 typedef struct {
-  data_t re;
-  data_t im;
-} complex;
+  data_t* re;
+  data_t* im;
+} vcomplex;
 
 /** Calculate MMSE estimation of x in y = H*x + n
  * \param H matrix of channel coefficients. Shape [NUM_RX_ANT][NUM_TX_ANT][NUM_SC]
@@ -22,10 +21,10 @@ typedef struct {
  * \param x_MMSE output MMSE estimation of x. Shape [NUM_TX_ANT][NUM_SC]
  */
 void mmse(
-  IN complex H[NUM_RX_ANT][NUM_TX_ANT][NUM_SC],
-  IN complex y[NUM_RX_ANT][NUM_SC],
-  IN complex R[NUM_TX_ANT][NUM_TX_ANT][NUM_SC],
-  OUT complex x_MMSE[NUM_TX_ANT][NUM_SC]);
+  IN vcomplex *H,
+  IN vcomplex *y,
+  IN vcomplex *R,
+  OUT vcomplex *x_MMSE);
 
 /** Calculate MMSE estimation of x in y = H*x + n. Uses a sqrt-free Cholesky decomposition.
  * \param H matrix of channel coefficients. Shape [NUM_RX_ANT][NUM_TX_ANT][NUM_SC]
@@ -34,42 +33,10 @@ void mmse(
  * \param x_MMSE output MMSE estimation of x. Shape [NUM_TX_ANT][NUM_SC]
  */
 void mmse_nosqrt(
-  IN complex H[NUM_RX_ANT][NUM_TX_ANT][NUM_SC],
-  IN complex y[NUM_RX_ANT][NUM_SC],
-  IN complex R[NUM_TX_ANT][NUM_TX_ANT][NUM_SC],
-  OUT complex x_MMSE[NUM_TX_ANT][NUM_SC]);
-
-/*
- * Complex operations
- */
-
-/** Create a complex number from real and imaginary parts */
-complex cmake(IN data_t re, IN data_t im);
-
-/** Complex multiplication */
-complex cmul(IN complex a, IN complex b);
-
-/** Complex absolute value squared */
-data_t cabs2(IN complex a);
-
-/** Complex addition */
-complex cadd(IN complex a, IN complex b);
-void cadd_acc(IN complex a, IN complex b);
-
-/** Complex subtraction */
-complex csub(IN complex a, IN complex b);
-
-/** Complex conjugate */
-complex cconj(IN complex a);
-
-/** Complex division */
-complex cdiv(IN complex a, IN complex b);
-
-/** Square root of a natural number */
-data_t sqrt(IN data_t x);
-
-/** Complex root */
-complex csqrt(IN complex a);
+  IN vcomplex *H,
+  IN vcomplex *y,
+  IN vcomplex *R,
+  OUT vcomplex *x_MMSE);
 
 /*
  * Complex matrix operations
@@ -80,16 +47,16 @@ complex csqrt(IN complex a);
  * \param AH output matrix. Shape [NUM_TX_ANT][NUM_RX_ANT][NUM_SC]
  */
 void cmat_hermitian_transpose_RxTx(
-  IN complex A[NUM_RX_ANT][NUM_TX_ANT][NUM_SC],
-  OUT complex AH[NUM_TX_ANT][NUM_RX_ANT][NUM_SC]);
+  IN vcomplex *A,
+  OUT vcomplex *AH);
 
 /** Calculate the Hermitian transpose of a matrix A
  * \param A input matrix. Shape [NUM_TX_ANT][NUM_TX_ANT][NUM_SC]
  * \param AH output matrix. Shape [NUM_TX_ANT][NUM_TX_ANT][NUM_SC]
  */
 void cmat_hermitian_transpose_TxTx(
-  IN complex A[NUM_TX_ANT][NUM_TX_ANT][NUM_SC],
-  OUT complex AH[NUM_TX_ANT][NUM_TX_ANT][NUM_SC]);
+  IN vcomplex *A,
+  OUT vcomplex *AH);
 
 /** Multiply two matrices A and B
  * \param A input matrix. Shape [NUM_TX_ANT][NUM_RX_ANT][NUM_SC]
@@ -97,9 +64,9 @@ void cmat_hermitian_transpose_TxTx(
  * \param result output matrix. Shape [NUM_TX_ANT][NUM_TX_ANT][NUM_SC]
  */
 void cmatmul_TxRx_RxTx(
-  IN complex A[NUM_TX_ANT][NUM_RX_ANT][NUM_SC],
-  IN complex B[NUM_RX_ANT][NUM_TX_ANT][NUM_SC],
-  OUT complex result[NUM_TX_ANT][NUM_TX_ANT][NUM_SC]);
+  IN vcomplex *A,
+  IN vcomplex *B,
+  OUT vcomplex *result);
 
 /** Multiply two matrices A and B
  * \param A input matrix. Shape [NUM_TX_ANT][NUM_TX_ANT][NUM_SC]
@@ -107,9 +74,9 @@ void cmatmul_TxRx_RxTx(
  * \param result output matrix. Shape [NUM_TX_ANT][NUM_TX_ANT][NUM_SC]
  */
 void cmatmul_TxTx_TxTx(
-  IN complex A[NUM_TX_ANT][NUM_TX_ANT][NUM_SC],
-  IN complex B[NUM_TX_ANT][NUM_TX_ANT][NUM_SC],
-  OUT complex result[NUM_TX_ANT][NUM_TX_ANT][NUM_SC]);
+  IN vcomplex *A,
+  IN vcomplex *B,
+  OUT vcomplex *result);
 
 /** Add two matrices A and B
  * \param A input matrix. Shape [NUM_TX_ANT][NUM_TX_ANT][NUM_SC]
@@ -117,9 +84,9 @@ void cmatmul_TxTx_TxTx(
  * \param result output matrix. Shape [NUM_TX_ANT][NUM_TX_ANT][NUM_SC]
  */
 void cmatadd_TxTx(
-  IN complex A[NUM_TX_ANT][NUM_TX_ANT][NUM_SC],
-  IN complex B[NUM_TX_ANT][NUM_TX_ANT][NUM_SC],
-  OUT complex result[NUM_TX_ANT][NUM_TX_ANT][NUM_SC]);
+  IN vcomplex *A,
+  IN vcomplex *B,
+  OUT vcomplex *result);
 
 /** Perfom Cholesky decomposition of a square matrix A
  * such that A = L*L^H with Cholesky–Banachiewicz algorithm
@@ -127,8 +94,8 @@ void cmatadd_TxTx(
  * \param L output lower triangular matrix L. Shape [NUM_TX_ANT][NUM_TX_ANT][NUM_SC]
  */
 void ccholesky_TxTx(
-  IN complex A[NUM_TX_ANT][NUM_TX_ANT][NUM_SC],
-  OUT complex L[NUM_TX_ANT][NUM_TX_ANT][NUM_SC]);
+  IN vcomplex *A,
+  OUT vcomplex *L);
 
 /** Perfom Cholesky decomposition of a square matrix A
  * such that A = L*D*L^H with Cholesky–Banachiewicz algorithm,
@@ -137,12 +104,12 @@ void ccholesky_TxTx(
  * This function does not calculate use csqrt and sqrt functions.
  * \param A input square matrix. Shape [NUM_TX_ANT][NUM_TX_ANT][NUM_SC]
  * \param L output lower triangular matrix L. Shape [NUM_TX_ANT][NUM_TX_ANT][NUM_SC]
- * \param D output diagonal matrix L. Shape [NUM_TX_ANT][NUM_TX_ANT][NUM_SC]
+ * \param D output diagonal of the diagonal matrix D. Shape [NUM_TX_ANT][NUM_SC]
  */
 void ccholesky_nosqrt_TxTx(
-  IN complex A[NUM_TX_ANT][NUM_TX_ANT][NUM_SC],
-  OUT complex L[NUM_TX_ANT][NUM_TX_ANT][NUM_SC],
-  OUT complex D[NUM_TX_ANT][NUM_TX_ANT][NUM_SC]);
+  IN vcomplex *A,
+  OUT vcomplex *L,
+  OUT vcomplex *D);
 
 /** Multiply a matrix A with a vector b
  * \param A input matrix. Shape [NUM_TX_ANT][NUM_RX_ANT][NUM_SC]
@@ -150,9 +117,9 @@ void ccholesky_nosqrt_TxTx(
  * \param result output vector. Shape [NUM_TX_ANT][NUM_SC]
  */
 void cmatvecmul_TxRx(
-  IN complex A[NUM_TX_ANT][NUM_RX_ANT][NUM_SC],
-  IN complex b[NUM_RX_ANT][NUM_SC],
-  OUT complex result[NUM_TX_ANT][NUM_SC]);
+  IN vcomplex *A,
+  IN vcomplex *b,
+  OUT vcomplex *result);
 
 /** Find z from L*z = b with a forward substitution
  * \param L lower triangular matrix. Shape [NUM_TX_ANT][NUM_TX_ANT][NUM_SC]
@@ -160,9 +127,9 @@ void cmatvecmul_TxRx(
  * \param result output vector z. Shape [NUM_TX_ANT][NUM_SC]
  */
 void cforwardsub_TxTx(
-  IN complex L[NUM_TX_ANT][NUM_TX_ANT][NUM_SC],
-  IN complex b[NUM_TX_ANT][NUM_SC],
-  OUT complex result[NUM_TX_ANT][NUM_SC]);
+  IN vcomplex *L,
+  IN vcomplex *b,
+  OUT vcomplex *result);
 
 /** Find x from U*x = b with a backward substitution
  * \param U upper triangular matrix. Shape [NUM_TX_ANT][NUM_TX_ANT][NUM_SC]
@@ -170,9 +137,9 @@ void cforwardsub_TxTx(
  * \param result output vector x. Shape [NUM_TX_ANT][NUM_SC]
  */
 void cbackwardsub_TxTx(
-  IN complex U[NUM_TX_ANT][NUM_TX_ANT][NUM_SC],
-  IN complex b[NUM_TX_ANT][NUM_SC],
-  OUT complex result[NUM_TX_ANT][NUM_SC]);
+  IN vcomplex *U,
+  IN vcomplex *b,
+  OUT vcomplex *result);
 
 /** Calculate mean squared error between the original x and the estimated x
  * \param x original x. Shape [NUM_TX_ANT][NUM_SC]
@@ -180,7 +147,7 @@ void cbackwardsub_TxTx(
  * \return mean squared error
  */
 acc_t mse(
-  IN complex x[NUM_TX_ANT][NUM_SC],
-  IN complex x_MMSE[NUM_TX_ANT][NUM_SC]);
+  IN vcomplex *x,
+  IN vcomplex *x_MMSE);
 
 #endif /* __MMSERV_H */
