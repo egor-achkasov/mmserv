@@ -34,5 +34,7 @@ int main() {
   x_MMSE.re = (data_t *)x_MMSE_re;
   x_MMSE.im = (data_t *)x_MMSE_im;
   mmse(&H, &y, &R, &x_MMSE);
-  printf("%f\n", mse(&x, &x_MMSE));
+  printf("MSE: %f\n", mse(&x, &x_MMSE));
+
+  printf("Shutting down\n");
 }
