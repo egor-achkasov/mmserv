@@ -1,18 +1,32 @@
 #include "../include/mmserv.h"
 
-#include "../../common/rivec/vector_defines.h"
-#include "riscv_vector.h"
-
 #include <stddef.h> /* for size_t */
+#include <stdint.h> /* for uint64_t */
 
 /*
  * Debug
  */
 
 #ifdef DEBUG
-#include "../../common/runtime.h"
-#include "../../common/util.h"
 #include "printf.h"
+
+static uint64_t g_timer;
+void start_timer()
+{
+  asm volatile("rdcycle %0" : "=r"(g_timer));
+}
+void stop_timer()
+{
+  asm volatile(
+    "rdcycle t0\n"
+    "sub %0, t0, %0"
+    : "+r"(g_timer)
+  );
+}
+uint64_t get_timer()
+{
+  return g_timer;
+}
 
 #define TIME(msg, func, ...) \
   start_timer(); \
@@ -119,113 +133,95 @@ void cmatgram_TxRx_cadd(
   size_t sz, vl;
   size_t off_sc, off_A, off_AH;
   size_t off_result_L, off_result_U;
-  vfloat32m1_t vA_re, vA_im, vAH_re, vAH_im;
-  vfloat32m1_t vR;
-  vfloat32m1_t vresult_re, vresult_im;
-  vfloat32m1_t vt;
-
-  printf("A:\n[");
-  for (size_t i = 0; i < NUM_TX_ANT; ++i) {
-    printf("[");
-    for (size_t j = 0; j < NUM_RX_ANT; ++j) {
-      for (size_t k = 0; k < NUM_SC; ++k) {
-        printf("\t%f %+fj,", A->re[i * NUM_RX_ANT * NUM_SC + j * NUM_SC + k], A->im[i * NUM_RX_ANT * NUM_SC + j * NUM_SC + k]);
-      }
-    }
-    printf("],\n");
-  }
-  printf("]\n");
-
-  printf("R:\n[");
-  for (size_t i = 0; i < NUM_TX_ANT; ++i) {
-    printf("[");
-    for (size_t j = 0; j < NUM_TX_ANT; ++j) {
-      for (size_t k = 0; k < NUM_SC; ++k) {
-        printf("\t%f %fj,", R->re[i * NUM_TX_ANT * NUM_SC + j * NUM_SC + k], R->im[i * NUM_TX_ANT * NUM_SC + j * NUM_SC + k]);
-      }
-    }
-    printf("],\n");
-  }
-  printf("]\n");
-
-  for (t1 = 0; t1 != NUM_TX_ANT; ++t1)
-    for (t2 = 0; t2 != NUM_TX_ANT; ++t2)
-      for (r = 0; r != NUM_SC; ++r)
-        result->re[t1 * NUM_TX_ANT * NUM_SC + t2 * NUM_SC + r]
-          = result->im[t1 * NUM_TX_ANT * NUM_SC + t2 * NUM_SC + r] = 0.f;
+  data_t *A_re, *A_im, *AH_re, *AH_im;
+  data_t *R_L_re, *R_L_im, *R_U_re, *R_U_im;
+  data_t *result_L_re, *result_L_im, *result_U_re, *result_U_im;
 
   for (t1 = 0; t1 != NUM_TX_ANT; ++t1)
     for (t2 = t1; t2 != NUM_TX_ANT; ++t2) {
       off_sc = 0;
       off_result_L = t1 * NUM_TX_ANT * NUM_SC + t2 * NUM_SC;
       off_result_U = t2 * NUM_TX_ANT * NUM_SC + t1 * NUM_SC;
+      result_L_re = &result->re[off_result_L];
+      result_L_im = &result->im[off_result_L];
+      result_U_re = &result->re[off_result_U];
+      result_U_im = &result->im[off_result_U];
       sz = NUM_SC;
+
       while (sz > 0) {
-        vl = vsetvl_e32m1(sz);
-        vresult_re = vfmv_v_f_f32m1(0.f, vl);
-        vresult_im = vfmv_v_f_f32m1(0.f, vl);
+        /* Initialize result registers */
+        /* v0 - result real part */
+        /* v1 - result imaginary part */
+        asm volatile(
+          "vsetvli %0, %1, e32, m1, ta, ma\n"
+          "vmv.v.x v0, %0\n"
+          "vmv.v.x v1, %0\n"
+          : "=r"(vl) : "r"(sz) : "v0", "v1");
 
         for (r = 0; r != NUM_RX_ANT; ++r) {
           off_A = r * NUM_TX_ANT * NUM_SC + t1 * NUM_SC + off_sc;
           off_AH = r * NUM_TX_ANT * NUM_SC + t2 * NUM_SC + off_sc;
-          vA_re = vle32_v_f32m1(&A->re[off_A], vl);
-          vA_im = vle32_v_f32m1(&A->im[off_A], vl);
-          vAH_re = vle32_v_f32m1(&A->re[off_AH], vl);
-          vAH_im = vle32_v_f32m1(&A->im[off_AH], vl);
+          A_re = &A->re[off_A];
+          A_im = &A->im[off_A];
+          AH_re = &A->re[off_AH];
+          AH_im = &A->im[off_AH];
 
-          /* real part */
-          vt = vfmul_vv_f32m1(vA_re, vAH_re, vl);
-          vresult_re = vfadd_vv_f32m1(vresult_re, vt, vl);
-          vt = vfmul_vv_f32m1(vA_im, vAH_im, vl);
-          vresult_re = vfadd_vv_f32m1(vresult_re, vt, vl);
-
-          /* imaginary part */
-          vt = vfmul_vv_f32m1(vA_im, vAH_re, vl);
-          vresult_im = vfadd_vv_f32m1(vresult_im, vt, vl);
-          vt = vfmul_vv_f32m1(vA_re, vAH_im, vl);
-          vresult_im = vfsub_vv_f32m1(vresult_im, vt, vl);
+          /* Calculate A^H*A */
+          /* v2 - A real part */
+          /* v3 - A imaginary part */
+          /* v4 - A^H real part */
+          /* v5 - A^H imaginary part */
+          asm volatile(
+            "vle32.v v2, (%0)\n"
+            "vle32.v v3, (%1)\n"
+            "vle32.v v4, (%2)\n"
+            "vle32.v v5, (%3)\n"
+            /* real part */
+            "vfmacc.vv v0, v2, v4\n"
+            "vfmacc.vv v0, v3, v5\n"
+            /* imaginary part */
+            "vfmacc.vv v1, v3, v4\n"
+            "vfnmsac.vv v1, v2, v5\n"
+            :
+            : "r"(A_re), "r"(A_im), "r"(AH_re), "r"(AH_im)
+            : "v0", "v1", "v2", "v3", "v4", "v5");
         }
 
-        /* Upper triangle */
         /* Add R */
-        vR = vle32_v_f32m1(&R->re[off_result_U], vl);
-        vresult_re = vfadd_vv_f32m1(vresult_re, vR, vl);
-        vR = vle32_v_f32m1(&R->im[off_result_U], vl);
-        vresult_im = vfadd_vv_f32m1(vresult_im, vR, vl);
-        /* Store result */
-        vse32_v_f32m1(&result->re[off_result_U], vresult_re, vl);
-        vse32_v_f32m1(&result->im[off_result_U], vresult_im, vl);
-
-        /* Lower triangle */
+        /* v2 - R real part */
+        /* v3 - R imaginary part */
+        R_U_re = &R->re[off_result_U];
+        R_U_im = &R->im[off_result_U];
+        asm volatile(
+          "vle32.v v2, (%0)\n"
+          "vle32.v v3, (%1)\n"
+          "vfadd.vv v2, v2, v0\n"
+          "vfadd.vv v3, v3, v1\n"
+          "vse32.v v2, (%2)\n"
+          "vse32.v v3, (%3)\n"
+          :
+          : "r"(R_U_re), "r"(R_U_im), "r"(result_U_re), "r"(result_U_im)
+          : "v0", "v1", "v2", "v3");
         if (t1 != t2) {
-          /* Conjugate (as result_ij = result_ji*) */
-          vresult_im = vfneg_v_f32m1(vresult_im, vl);
-          /* Add R */
-          vR = vle32_v_f32m1(&R->re[off_result_L], vl);
-          vresult_re = vfadd_vv_f32m1(vresult_re, vR, vl);
-          vR = vle32_v_f32m1(&R->im[off_result_L], vl);
-          vresult_im = vfadd_vv_f32m1(vresult_im, vR, vl);
-          /* Store result */
-          vse32_v_f32m1(&result->re[off_result_L], vresult_re, vl);
-          vse32_v_f32m1(&result->im[off_result_L], vresult_im, vl);
+          R_L_re = &R->re[off_result_L];
+          R_L_im = &R->im[off_result_L];
+          asm volatile(
+            /* Lower triangle */
+            "vle32.v v2, (%0)\n"
+            "vle32.v v3, (%1)\n"
+            "vfadd.vv v2, v2, v0\n"
+            "vfsub.vv v3, v3, v1\n"
+            "vse32.v v2, (%2)\n"
+            "vse32.v v3, (%3)\n"
+            :
+            : "r"(R_L_re), "r"(R_L_im), "r"(result_L_re), "r"(result_L_im)
+            : "v0", "v1", "v2", "v3");
         }
 
         sz -= vl;
         off_sc += vl;
       }
     }
-
-  printf("result:\n[");
-  for (size_t i = 0; i < NUM_TX_ANT; ++i) {
-    printf("[");
-    for (size_t j = 0; j < NUM_TX_ANT; ++j) {
-      for (size_t k = 0; k < NUM_SC; ++k) {
-        printf("\t%f %fj", result->re[i * NUM_TX_ANT * NUM_SC + j * NUM_SC + k], result->im[i * NUM_TX_ANT * NUM_SC + j * NUM_SC + k]);
-      }
-    }
-    printf("]\n");
-  }
-  printf("]\n");
 }
 
 void ccholesky_TxTx(
