@@ -154,8 +154,8 @@ void cmatgram_TxRx_cadd(
         /* v1 - result imaginary part */
         asm volatile(
           "vsetvli %0, %1, e32, m1, ta, ma\n"
-          "vmv.v.x v0, %0\n"
-          "vmv.v.x v1, %0\n"
+          "vmv.v.i v0, 0\n"
+          "vmv.v.i v1, 0\n"
           : "=r"(vl) : "r"(sz) : "v0", "v1");
 
         for (r = 0; r != NUM_RX_ANT; ++r) {
@@ -351,29 +351,57 @@ void cmatvecmul_TxRx(
   OUT vcomplex *result)
 {
   size_t i, j, k;
-  size_t off_ik, off_ijk = 0, off_jk;
-  size_t off_ik_bck;
-  data_t A_re, A_im, b_re, b_im;
-
-  for (i = 0; i < NUM_TX_ANT * NUM_SC; ++i)
-    result->re[i] = result->im[i] = 0.f;
+  size_t off_A, off_b, off_result, off_sc;
+  size_t sz, vl;
 
   for (i = 0; i < NUM_TX_ANT; ++i) {
-    off_jk = 0;
-    off_ik_bck = i * NUM_SC;
-    for (j = 0; j < NUM_RX_ANT; ++j) {
-      off_ik = off_ik_bck;
-      for (k = 0; k < NUM_SC; ++k) {
-        A_re = A->re[off_ijk];
-        A_im = A->im[off_ijk];
-        b_re = b->re[off_jk];
-        b_im = b->im[off_jk];
-        result->re[off_ik] += A_re * b_re - A_im * b_im;
-        result->im[off_ik] += A_re * b_im + A_im * b_re;
-        ++off_ik;
-        ++off_ijk;
-        ++off_jk;
+    off_result = i * NUM_SC;
+    off_sc = 0;
+    sz = NUM_SC;
+
+    /* Initialize result registers */
+    /* v0 - result real part */
+    /* v1 - result imaginary part */
+    asm volatile(
+      "vsetvli %0, %1, e32, m1, ta, ma\n"
+      "vmv.v.i v0, 0\n"
+      "vmv.v.i v1, 0\n"
+      : "=r"(vl)
+      : "r"(sz)
+    );
+
+    while (sz > 0) {
+      for (j = 0; j < NUM_RX_ANT; ++j) {
+        off_A = i * NUM_RX_ANT * NUM_SC + j * NUM_SC + off_sc;
+        off_b = j * NUM_SC + off_sc;
+        asm volatile(
+          "vle32.v v2, (%0)\n"
+          "vle32.v v3, (%1)\n"
+          "vle32.v v4, (%2)\n"
+          "vle32.v v5, (%3)\n"
+          /* real part */
+          "vfmacc.vv v0, v2, v4\n"
+          "vfnmsac.vv v0, v3, v5\n"
+          /* imaginary part */
+          "vfmacc.vv v1, v3, v4\n"
+          "vfmacc.vv v1, v2, v5\n"
+          :
+          : "r"(&A->re[off_A]), "r"(&A->im[off_A]),
+          "r"(&b->re[off_b]), "r"(&b->im[off_b])
+          );
       }
+
+      /* Store result */
+      asm volatile(
+        "vse32.v v0, (%0)\n"
+        "vse32.v v1, (%1)\n"
+        :
+        : "r"(&result->re[off_result]), "r"(&result->im[off_result])
+      );
+
+      sz -= vl;
+      off_result += vl;
+      off_sc += vl;
     }
   }
 }
