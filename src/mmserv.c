@@ -406,48 +406,98 @@ void cmatvecmul_TxRx(
   }
 }
 
+/** Complex forward substitution L*z = b
+ * 
+ * z_i = (b_i - \sum_{k=0}^{i-1} L_{ik} z_k) / L_{ii}
+ * 
+ * \param L lower triangular matrix. Shape [NUM_TX_ANT][NUM_TX_ANT][NUM_SC]
+ * \param b vector. Shape [NUM_TX_ANT][NUM_SC]
+ * \param result output vector. Shape [NUM_TX_ANT][NUM_SC]
+ */
 void cforwardsub_TxTx(
   IN vcomplex *L,
   IN vcomplex *b,
   OUT vcomplex *result)
 {
-  size_t i, j, k;
-  size_t off_ij = 0, off_ikj, off_kj, off_iij;
-  size_t off_ikj_bck;
-  data_t L_re, L_im, result_re, result_im;
+  size_t i, j;
+  size_t sz, vl;
+  size_t off_sc;
 
-  for (i = 0; i < NUM_TX_ANT; ++i) {
-    off_ij = i * NUM_SC;
-    off_ikj_bck = i * NUM_TX_ANT * NUM_SC;
-    off_iij = i * NUM_TX_ANT * NUM_SC + i * NUM_SC;
-    for (j = 0; j < NUM_SC; ++j) {
-      result->re[off_ij] = b->re[off_ij];
-      result->im[off_ij] = b->im[off_ij];
+  for (i = 0; i != NUM_TX_ANT; ++i) {
+    printf("i: %d\n", i);
+    off_sc = 0;
+    sz = NUM_SC;
 
-      off_ikj = off_ikj_bck;
-      off_kj = j;
-      for (k = 0; k < i; ++k) {
-        L_re = L->re[off_ikj];
-        L_im = L->im[off_ikj];
-        result_re = result->re[off_kj];
-        result_im = result->im[off_kj];
-        result->re[off_ij] -= L_re * result_re - L_im * result_im;
-        result->im[off_ij] -= L_re * result_im + L_im * result_re;
-        off_kj += NUM_SC;
-        off_ikj += NUM_SC;
+    while (sz > 0) {
+      printf("sz: %d\n", sz);
+      /* Initialize result registers as b */
+      /* v0 - result real part */
+      /* v1 - result imaginary part */
+      asm volatile (
+        "vsetvli %0, %1, e32, m1, ta, ma\n"
+        "vle32.v v0, (%2)\n"
+        "vle32.v v1, (%3)\n"
+        : "=r"(vl)
+        : "r"(sz),
+        "r"(&b->re[i * NUM_SC + off_sc]),
+        "r"(&b->im[i * NUM_SC + off_sc])
+      );
+
+      for (j = 0; j != i; ++j) {
+        printf("j: %d\n", j);
+        /* b - sum L_ij * z_j */
+        /* v2 - L real part */
+        /* v3 - L imaginary part */
+        /* v4 - result_j real part */
+        /* v5 - result_j imaginary part */
+        asm volatile (
+          "vle32.v v2, (%0)\n"
+          "vle32.v v3, (%1)\n"
+          "vle32.v v4, (%2)\n"
+          "vle32.v v5, (%3)\n"
+          /* real part */
+          "vfnmsac.vv v0, v2, v4\n"
+          "vfmacc.vv v0, v3, v5\n"
+          /* imaginary part */
+          "vfnmsac.vv v1, v3, v4\n"
+          "vfmsac.vv v1, v2, v5\n"
+          :
+          : "r"(&L->re[i * NUM_TX_ANT * NUM_SC + j * NUM_SC + off_sc]),
+          "r"(&L->im[i * NUM_TX_ANT * NUM_SC + j * NUM_SC + off_sc]),
+          "r"(&result->re[j * NUM_SC + off_sc]),
+          "r"(&result->im[j * NUM_SC + off_sc])
+        );
       }
 
-      result_re = result->re[off_ij];
-      result_im = result->im[off_ij];
-      cdiv(
-        result_re, result_im,
-        L->re[off_iij], L->im[off_iij],
-        &result->re[off_ij],
-        &result->im[off_ij]);
+      /* Divide by L_ii */
+      /* v2 - L_ii real part */
+      /* v3 - L_ii imaginary part */
+      asm volatile (
+        "vle32.v v2, (%0)\n"
+        "vle32.v v3, (%1)\n"
+        /* calculate L_ii_re^2 + L_ii_im^2 -> v4 */
+        "vfmul.vv v4, v2, v2\n"
+        "vfmacc.vv v4, v3, v3\n"
+        /* real part */
+        "vfmul.vv v5, v0, v2\n"
+        "vfmacc.vv v5, v1, v3\n"
+        "vdiv.vv v0, v5, v4\n"
+        /* imaginary part */
+        "vfmul.vv v6, v1, v2\n"
+        "vfnmsac.vv v6, v0, v3\n"
+        "vfdiv.vv v1, v6, v4\n"
+        /* store result */
+        "vse32.v v0, (%2)\n"
+        "vse32.v v1, (%3)\n"
+        :
+        : "r"(&L->re[i * NUM_TX_ANT * NUM_SC + i * NUM_SC + off_sc]),
+          "r"(&L->im[i * NUM_TX_ANT * NUM_SC + i * NUM_SC + off_sc]),
+          "r"(&result->re[i * NUM_SC + off_sc]),
+          "r"(&result->im[i * NUM_SC + off_sc])
+      );
 
-      ++off_ij;
-      ++off_ikj_bck;
-      ++off_iij;
+      off_sc += vl;
+      sz -= vl;
     }
   }
 }
