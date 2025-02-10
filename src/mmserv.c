@@ -156,7 +156,7 @@ void cmatgram_TxRx_cadd(
           "vsetvli %0, %1, e32, m1, ta, ma\n"
           "vmv.v.i v0, 0\n"
           "vmv.v.i v1, 0\n"
-          : "=r"(vl) : "r"(sz) : "v0", "v1");
+          : "=r"(vl) : "r"(sz));
 
         for (r = 0; r != NUM_RX_ANT; ++r) {
           off_A = r * NUM_TX_ANT * NUM_SC + t1 * NUM_SC + off_sc;
@@ -184,7 +184,7 @@ void cmatgram_TxRx_cadd(
             "vfnmsac.vv v1, v2, v5\n"
             :
             : "r"(A_re), "r"(A_im), "r"(AH_re), "r"(AH_im)
-            : "v0", "v1", "v2", "v3", "v4", "v5");
+          );
         }
 
         /* Add R */
@@ -215,7 +215,7 @@ void cmatgram_TxRx_cadd(
             "vse32.v v3, (%3)\n"
             :
             : "r"(R_L_re), "r"(R_L_im), "r"(result_L_re), "r"(result_L_im)
-            : "v0", "v1", "v2", "v3");
+          );
         }
 
         sz -= vl;
@@ -460,12 +460,12 @@ void cforwardsub_TxTx(
           "vfmacc.vv v0, v3, v5\n"
           /* imaginary part */
           "vfnmsac.vv v1, v3, v4\n"
-          "vfmsac.vv v1, v2, v5\n"
+          "vfnmsac.vv v1, v2, v5\n"
           :
           : "r"(&L->re[i * NUM_TX_ANT * NUM_SC + j * NUM_SC + off_sc]),
-          "r"(&L->im[i * NUM_TX_ANT * NUM_SC + j * NUM_SC + off_sc]),
-          "r"(&result->re[j * NUM_SC + off_sc]),
-          "r"(&result->im[j * NUM_SC + off_sc])
+            "r"(&L->im[i * NUM_TX_ANT * NUM_SC + j * NUM_SC + off_sc]),
+            "r"(&result->re[j * NUM_SC + off_sc]),
+            "r"(&result->im[j * NUM_SC + off_sc])
         );
       }
 
@@ -502,11 +502,99 @@ void cforwardsub_TxTx(
   }
 }
 
+/** Complex backward substitution L^H*z = b
+ * 
+ * z_i = (b_i - \sum_{j=i+1}^{n-1} L_{ji} z_k) / L_{ii}
+ * 
+ * \param L lower triangular matrix. Shape [NUM_TX_ANT][NUM_TX_ANT][NUM_SC]
+ * \param b vector. Shape [NUM_TX_ANT][NUM_SC]
+ * \param result output vector. Shape [NUM_TX_ANT][NUM_SC]
+ */
 void cbackwardsub_TxTx(
-  IN vcomplex *U,
+  IN vcomplex *L,
   IN vcomplex *b,
   OUT vcomplex *result)
 {
+  size_t i, j;
+  size_t sz, vl;
+  size_t off_sc;
+
+  for (i = NUM_TX_ANT - 1; i != 0; --i) {
+    off_sc = 0;
+    sz = NUM_SC;
+
+    while (sz > 0){
+      /* Initialize result registers as b */
+      /* v0 - result real part */
+      /* v1 - result imaginary part */
+      asm volatile(
+        "vsetvli %0, %1, e32, m1, ta, ma\n"
+        "vle32.v v0, (%2)\n"
+        "vle32.v v1, (%3)\n"
+        : "=r"(vl)
+        : "r"(sz),
+        "r"(&b->re[i * NUM_SC + off_sc]),
+        "r"(&b->im[i * NUM_SC + off_sc])
+      );
+
+      for (j = i + 1; j < NUM_TX_ANT; ++j) {
+        /* b - sum L_ji * z_j */
+        /* v2 - L real part */
+        /* v3 - L imaginary part */
+        /* v4 - result_j real part */
+        /* v5 - result_j imaginary part */
+        asm volatile(
+          "vle32.v v2, (%0)\n"
+          "vle32.v v3, (%1)\n"
+          "vle32.v v4, (%2)\n"
+          "vle32.v v5, (%3)\n"
+          /* real part */
+          "vfnmsac.vv v0, v2, v4\n"
+          "vfmacc.vv v0, v3, v5\n"
+          /* imaginary part */
+          "vfnmsac.vv v1, v3, v4\n"
+          "vfnmsac.vv v1, v2, v5\n"
+          :
+          : "r"(&L->re[j * NUM_TX_ANT * NUM_SC + i * NUM_SC + off_sc]),
+            "r"(&L->im[j * NUM_TX_ANT * NUM_SC + i * NUM_SC + off_sc]),
+            "r"(&result->re[j * NUM_SC + off_sc]),
+            "r"(&result->im[j * NUM_SC + off_sc])
+        );
+      }
+
+      /* Divide by L_ii */
+      /* v2 - L_ii real part */
+      /* v3 - L_ii imaginary part */
+      asm volatile (
+        "vle32.v v2, (%0)\n"
+        "vle32.v v3, (%1)\n"
+        /* calculate L_ii_re^2 + L_ii_im^2 -> v4 */
+        "vfmul.vv v4, v2, v2\n"
+        "vfmacc.vv v4, v3, v3\n"
+        /* real part */
+        "vfmul.vv v5, v0, v2\n"
+        "vfmacc.vv v5, v1, v3\n"
+        "vdiv.vv v0, v5, v4\n"
+        /* imaginary part */
+        "vfmul.vv v6, v1, v2\n"
+        "vfnmsac.vv v6, v0, v3\n"
+        "vfdiv.vv v1, v6, v4\n"
+        /* store result */
+        "vse32.v v0, (%2)\n"
+        "vse32.v v1, (%3)\n"
+      :
+      : "r"(&L->re[i * NUM_TX_ANT * NUM_SC + i * NUM_SC + off_sc]),
+        "r"(&L->im[i * NUM_TX_ANT * NUM_SC + i * NUM_SC + off_sc]),
+        "r"(&result->re[i * NUM_SC + off_sc]),
+        "r"(&result->im[i * NUM_SC + off_sc])
+      );
+
+      sz -= vl;
+      off_sc += vl;
+    }
+  }
+
+
   /* TODO optimize offsets */
 
   size_t i, j, k;
@@ -601,13 +689,9 @@ void mmse(
     &L, &HHy, &z);
   /* x_MMSE: L^H*x_MMSE = z */
   TIME(
-    "Hermitian transpose (TxTx): %ld\n",
-    cmat_hermitian_transpose_TxTx,
-    &L, &LH);
-  TIME(
     "Backward substitution (TxTx): %ld\n",
     cbackwardsub_TxTx,
-    &LH, &z, x_MMSE);
+    &L, &z, x_MMSE);
 }
 
 void mmse_nosqrt(
@@ -648,7 +732,8 @@ void mmse_nosqrt(
   LH.re = (data_t *)LH_re;
   LH.im = (data_t *)LH_im;
 
-  /* H^H */
+  /* NOT IMPLEMENTED */
+
   #if 0
   TIME(
     "Hermitian transpose (RxTx): %ld\n",
