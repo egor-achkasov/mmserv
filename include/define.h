@@ -14,5 +14,9 @@
 
 typedef float data_t;
 typedef float acc_t;
+typedef struct {
+  data_t *re;
+  data_t *im;
+} vcomplex;
 
 #endif
