@@ -624,12 +624,38 @@ void mmse()
 acc_t mse()
 {
   acc_t sum = 0.;
-  size_t off_ij = 0;
+  size_t off = 0;
   data_t sub1, sub2;
-  for (; off_ij != NUM_TX_ANT * NUM_SC; ++off_ij) {
-    sub1 = g_x.re[off_ij] - g_x_MMSE.re[off_ij];
-    sub2 = g_x.im[off_ij] - g_x_MMSE.im[off_ij];
-    sum += (sub1 * sub1 + sub2 * sub2) / (data_t)(NUM_TX_ANT * NUM_SC);
+  size_t sz = NUM_TX_ANT * NUM_SC, vl;
+  register data_t num_tx_num_sc_reg __asm__("f0") = (data_t)(NUM_TX_ANT * NUM_SC); 
+
+  while (sz > 0) {
+    __asm__ volatile (
+      "vsetvli %0, %1, e32, m1, ta, ma\n"
+      : "=r"(vl)
+      : "r"(sz));
+    __asm__ volatile (
+      "vle32.v v0, (%1)\n"
+      "vle32.v v1, (%2)\n"
+      "vle32.v v2, (%3)\n"
+      "vle32.v v3, (%4)\n"
+      "vfsub.vv v0, v0, v2\n"
+      "vfsub.vv v1, v1, v3\n"
+      "vfmul.vv v0, v0, v0\n"
+      "vfmul.vv v1, v1, v1\n"
+      "vfadd.vv v0, v0, v1\n"
+      "vfdiv.vf v0, v0, %5\n"
+      "vfredusum.vs v0, v4, v5\n"
+      "vmv.x.s %0, v0\n"
+      : "+r"(sum)
+      : "r"(&g_x.re[off]),
+        "r"(&g_x.re[off]),
+        "r"(&g_x_MMSE.re[off]),
+        "r"(&g_x_MMSE.re[off]),
+        "f"(num_tx_num_sc_reg));
+    sz -= vl;
+    off += vl;
   }
+
   return sum;
 }
