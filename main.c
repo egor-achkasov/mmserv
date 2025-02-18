@@ -3,7 +3,11 @@
 #include "../common/printf.h"
 
 /* extern functions */
-extern void mmse();
+extern void cmatgram_TxRx_cadd();
+extern void ccholesky_TxTx();
+extern void cmatvecmul_TxRx();
+extern void cforwardsub_TxTx();
+extern void cbackwardsub_TxTx();
 extern acc_t mse();
 
 /* Raw data */
@@ -31,10 +35,38 @@ data_t x_MMSE_re[NUM_TX_ANT][NUM_SC];
 data_t x_MMSE_im[NUM_TX_ANT][NUM_SC];
 vcomplex g_x_MMSE = { .re = (data_t *)x_MMSE_re, .im = (data_t *)x_MMSE_im };
 
-int main() {
-  /* Calculate the MMSE approximation */
-  mmse();
-  printf("MSE: %f\n", mse());
+extern vcomplex g_HH, h_y, g_HHy;
+size_t num_rx_cur=1, num_tx_cur=1, num_sc_cur=1;
 
-  printf("Shutting down\n");
+int main() {
+  unsigned long long start, end;
+
+  size_t t1,t2,t3,t4,t5;
+  for (num_rx_cur = 1; num_rx_cur <= NUM_RX_ANT; ++num_rx_cur)
+    for (num_tx_cur = 1; num_tx_cur <= NUM_TX_ANT; ++num_tx_cur)
+      for (num_sc_cur = 1; num_sc_cur <= NUM_SC; num_sc_cur += 1) {
+        __asm__ volatile("rdcycle %0" : "=r"(start));
+        cmatgram_TxRx_cadd();
+        __asm__ volatile("rdcycle %0" : "=r"(end));
+        t1 = end - start;
+        __asm__ volatile("rdcycle %0" : "=r"(start));
+        ccholesky_TxTx();
+        __asm__ volatile("rdcycle %0" : "=r"(end));
+        t2 = end - start;
+        __asm__ volatile("rdcycle %0" : "=r"(start));
+        cmatvecmul_TxRx();
+        __asm__ volatile("rdcycle %0" : "=r"(end));
+        t3 = end - start;
+        __asm__ volatile("rdcycle %0" : "=r"(start));
+        cforwardsub_TxTx();
+        __asm__ volatile("rdcycle %0" : "=r"(end));
+        t4 = end - start;
+        __asm__ volatile("rdcycle %0" : "=r"(start));
+        cbackwardsub_TxTx();
+        __asm__ volatile("rdcycle %0" : "=r"(end));
+        t5 = end - start;
+        printf("%llu,%llu,%llu,%llu,%llu,", t1, t2, t3, t4, t5);
+      }
+
+  return 0;
 }

@@ -46,6 +46,8 @@ uint64_t get_timer()
 /* Externs */
 extern vcomplex g_x, g_H, g_R, g_y;
 extern vcomplex g_x_MMSE;
+extern size_t num_rx_cur, num_tx_cur, num_sc_cur;
+
 
 /* Raw data */
 data_t HH_re[NUM_TX_ANT][NUM_RX_ANT][NUM_SC];
@@ -70,48 +72,6 @@ vcomplex g_z = { .re = (data_t *)z_re, .im = (data_t *)z_im };
 vcomplex g_LH = { .re = (data_t *)LH_re, .im = (data_t *)LH_im };
 
 /*
- * Complex functions
- */
-
-void cdiv(
-  IN data_t a_re, IN data_t a_im,
-  IN data_t b_re, IN data_t b_im,
-  OUT data_t *res_re, OUT data_t *res_im)
-{
-  *res_im = b_re * b_re + b_im * b_im;
-  *res_re = (a_re * b_re + a_im * b_im) / *res_im;
-  *res_im = (a_im * b_re - a_re * b_im) / *res_im;
-}
-
-data_t sqrt(IN data_t x)
-{
-  __asm__ volatile("fsqrt.s %0, %1" : "=f"(x) : "f"(x));
-  return x;
-}
-void csqrt(
-  IN data_t re, IN data_t im,
-  OUT data_t *res_re, OUT data_t *res_im)
-{
-  if (im == 0){
-    if (re < 0) {
-      *res_re = 0;
-      *res_im = sqrt(-re);
-      return;
-    }
-    else {
-      *res_re = sqrt(re);
-      *res_im = 0;
-      return;
-    }
-  }
-  data_t length = sqrt(re * re + im * im);
-  *res_re = sqrt((length + re) / 2.f);
-  *res_im = sqrt((length - re) / 2.f);
-  if (im < 0.f)
-    *res_re = -*res_re;
-}
-
-/*
  * Complex matrix operations
  */
 
@@ -133,16 +93,16 @@ void cmatgram_TxRx_cadd()
   data_t *R_L_re, *R_L_im, *R_U_re, *R_U_im;
   data_t *HH_H_L_re, *HH_H_L_im, *HH_H_U_re, *HH_H_U_im;
 
-  for (t1 = 0; t1 != NUM_TX_ANT; ++t1)
-    for (t2 = t1; t2 != NUM_TX_ANT; ++t2) {
+  for (t1 = 0; t1 != num_tx_cur; ++t1)
+    for (t2 = t1; t2 != num_tx_cur; ++t2) {
       off_sc = 0;
-      off_HH_H_L = t1 * NUM_TX_ANT * NUM_SC + t2 * NUM_SC;
-      off_HH_H_U = t2 * NUM_TX_ANT * NUM_SC + t1 * NUM_SC;
+      off_HH_H_L = t1 * num_tx_cur * num_sc_cur + t2 * num_sc_cur;
+      off_HH_H_U = t2 * num_tx_cur * num_sc_cur + t1 * num_sc_cur;
       HH_H_L_re = &g_HH_H.re[off_HH_H_L];
       HH_H_L_im = &g_HH_H.im[off_HH_H_L];
       HH_H_U_re = &g_HH_H.re[off_HH_H_U];
       HH_H_U_im = &g_HH_H.im[off_HH_H_U];
-      sz = NUM_SC;
+      sz = num_sc_cur;
 
       while (sz > 0) {
         /* Initialize HH_H registers */
@@ -154,9 +114,9 @@ void cmatgram_TxRx_cadd()
           "vmv.v.i v1, 0\n"
           : "=r"(vl) : "r"(sz));
 
-        for (r = 0; r != NUM_RX_ANT; ++r) {
-          off_A = r * NUM_TX_ANT * NUM_SC + t1 * NUM_SC + off_sc;
-          off_AH = r * NUM_TX_ANT * NUM_SC + t2 * NUM_SC + off_sc;
+        for (r = 0; r != num_rx_cur; ++r) {
+          off_A = r * num_tx_cur * num_sc_cur + t1 * num_sc_cur + off_sc;
+          off_AH = r * num_tx_cur * num_sc_cur + t2 * num_sc_cur + off_sc;
           A_re = &g_H.re[off_A];
           A_im = &g_H.im[off_A];
           AH_re = &g_H.re[off_AH];
@@ -222,127 +182,137 @@ void cmatgram_TxRx_cadd()
 /** Complex Cholesky decomposition L of a Hermitian positive-definite matrix HH_H
  *
  * HH_H = L*L^H
+ * L_ij = (HH_H_ij - \sum_{k=0}^{j-1} L_ik L_jk^*) / L_jj
+ * L_ii = sqrt(HH_H_ii - \sum_{k=0}^{i-1} L_ik L_ik^*)
  *
  * \global g_HH_H matrix. Shape [NUM_TX_ANT][NUM_TX_ANT][NUM_SC]
  * \global g_L output lower triangular matrix. Shape [NUM_TX_ANT][NUM_TX_ANT][NUM_SC]
  */
 void ccholesky_TxTx()
 {
-  size_t i, j, k, l;
-  size_t off_ijk, off_ilk, off_jlk, off_jjk;
-  data_t sum_re, sum_im;
-  data_t t1_re, t1_im, t2_re, t2_im;
+  size_t i, j, k;
+  size_t sz, vl;
+  size_t off_sc;
 
-  /* Init upper triangle with zeros */
-  for (i = 0; i < NUM_TX_ANT; ++i)
-    for (j = i+1; j < NUM_TX_ANT; ++j) {
-      off_ijk = i * NUM_TX_ANT * NUM_SC + j * NUM_SC;
-      for (k = 0; k < NUM_SC; ++k) {
-        g_L.re[off_ijk] = g_L.im[off_ijk] = 0;
-        ++off_ijk;
+  /* Init float registers */
+  register float f0 __asm__("f0") = 2.0f;
+
+  for (i = 0; i < num_tx_cur; ++i)
+    for (j = 0; j <= i; ++j) {
+      sz = num_sc_cur;
+      off_sc = 0;
+
+      while (sz > 0) {
+        /* Initialize L registers */
+        /* v0 - L_ij real part = HH_H_ij.re */
+        /* v1 - L_ij imaginary part  = HH_H_ij.im */
+        __asm__ volatile(
+          "vsetvli %0, %1, e32, m1, ta, ma\n"
+          : "=r"(vl) : "r"(sz));
+        __asm__ volatile(
+          "vle32.v v0, (%0)\n"
+          "vle32.v v1, (%1)\n"
+        :
+        : "r"(&g_HH_H.re[i * num_tx_cur * num_sc_cur + j * num_sc_cur + off_sc]),
+          "r"(&g_HH_H.im[i * num_tx_cur * num_sc_cur + j * num_sc_cur + off_sc])
+        );
+
+        /* Calculate sum_{k=0}^{j-1} L_ik L_jk^* */
+        /* v2 - sum real part */
+        /* v3 - sum imaginary part */
+        __asm__ volatile(
+          "vmv.v.i v2, 0\n"
+          "vmv.v.i v3, 0\n"
+        );
+        for (k = 0; k < j; ++k) {
+          __asm__ volatile(
+            "vle32.v v4, (%0)\n"
+            "vle32.v v5, (%1)\n"
+            "vle32.v v6, (%2)\n"
+            "vle32.v v7, (%3)\n"
+            /* real part */
+            "vfmacc.vv v2, v4, v6\n"
+            "vfmacc.vv v2, v5, v7\n"
+            /* imaginary part */
+            "vfmacc.vv v3, v5, v6\n"
+            "vfnmsac.vv v3, v4, v7\n"
+          :
+          : "r"(&g_L.re[i * num_tx_cur * num_sc_cur + k * num_sc_cur + off_sc]),
+            "r"(&g_L.im[i * num_tx_cur * num_sc_cur + k * num_sc_cur + off_sc]),
+            "r"(&g_L.re[j * num_tx_cur * num_sc_cur + k * num_sc_cur + off_sc]),
+            "r"(&g_L.im[j * num_tx_cur * num_sc_cur + k * num_sc_cur + off_sc])
+          );
+        }
+
+        /* HH_H_ii - sum */
+        __asm__ volatile(
+          "vfsub.vv v0, v0, v2\n"
+          "vfsub.vv v1, v1, v3\n"
+        );
+
+        if (i == j) {
+          /* Calculate L_ii = sqrt(HH_H_ii - sum_{k=0}^{i-1} L_ik L_ik^*) */
+          __asm__ volatile(
+            /* Complex sqrt */
+
+            /* v2 = r = sqrt(re^2 + im^2) */
+            "vfmul.vv v2, v0, v0\n"
+            "vfmacc.vv v2, v1, v1\n"
+            "vfsqrt.v v2, v2\n"
+
+            /* v3 - real part */
+            "vfadd.vv v3, v2, v0\n" /* r + re */
+            "vfdiv.vf v3, v3, f0\n" /* (r + re) / 2 */
+            "vfsqrt.v v3, v3\n" /* sqrt((r + re) / 2) */
+            /* v4 - imaginary part */
+            "vfsub.vv v4, v2, v0\n" /* r - re */
+            "vfdiv.vf v4, v4, f0\n" /* (r - re) / 2 */
+            "vfsqrt.v v4, v4\n" /* sqrt((r - re) / 2) */
+            "vfsgnj.vv v4, v4, v1\n" /* sgn(im) * sqrt((r - re) / 2) */
+
+            /* TODO handle im == 0 */
+
+            /* Move the result to v0 and v1 */
+            "vmv.v.v v0, v3\n"
+            "vmv.v.v v1, v4\n"
+          );
+        } else {
+          /* Calculate L_ij = (HH_H_ij - sum) / L_jj */
+          __asm__ volatile(
+            /* L_jj */
+            "vle32.v v2, (%0)\n"
+            "vle32.v v3, (%1)\n"
+            /* calculate L_jj_re^2 + L_jj_im^2 -> v4 */
+            "vfmul.vv v4, v2, v2\n"
+            "vfmacc.vv v4, v3, v3\n"
+            /* real part */
+            "vfmul.vv v5, v0, v2\n"
+            "vfmacc.vv v5, v1, v3\n"
+            /* imaginary part */
+            "vfmul.vv v6, v1, v2\n"
+            "vfnmsac.vv v6, v0, v3\n"
+            /* divide and store at v0 and v1 */
+            "vfdiv.vv v0, v5, v4\n"
+            "vfdiv.vv v1, v6, v4\n"
+          :
+          : "r"(&g_L.re[j * num_tx_cur * num_sc_cur + j * num_sc_cur + off_sc]),
+            "r"(&g_L.im[j * num_tx_cur * num_sc_cur + j * num_sc_cur + off_sc])
+          );
+        }
+
+        /* Store result */
+        __asm__ volatile(
+          "vse32.v v0, (%0)\n"
+          "vse32.v v1, (%1)\n"
+          :
+          : "r"(&g_L.re[i * num_tx_cur * num_sc_cur + j * num_sc_cur + off_sc]),
+            "r"(&g_L.im[i * num_tx_cur * num_sc_cur + j * num_sc_cur + off_sc])
+        );
+
+        sz -= vl;
+        off_sc += vl;
       }
     }
-
-  /* Calculate diagonal and lower triangular entries */
-  for (i = 0; i < NUM_TX_ANT; ++i)
-    for (j = 0; j < i+1; ++j)
-      for (k = 0; k < NUM_SC; ++k){
-        off_ijk = i * NUM_TX_ANT * NUM_SC + j * NUM_SC + k;
-        sum_re = g_HH_H.re[off_ijk];
-        sum_im = g_HH_H.im[off_ijk];
-        for (l = 0; l < j; ++l) {
-          off_ilk = i * NUM_TX_ANT * NUM_SC + l * NUM_SC + k;
-          off_jlk = j * NUM_TX_ANT * NUM_SC + l * NUM_SC + k;
-          t1_re = g_L.re[off_ilk];
-          t1_im = g_L.im[off_ilk];
-          t2_re = g_L.re[off_jlk];
-          t2_im = g_L.im[off_jlk];
-          sum_re -= t1_re * t2_re + t1_im * t2_im;
-          sum_im -= t1_im * t2_re - t1_re * t2_im;
-        }
-        if (i == j)
-          csqrt(
-            sum_re, sum_im,
-            &g_L.re[off_ijk],
-            &g_L.im[off_ijk]);
-        else {
-          off_jjk = j * NUM_TX_ANT * NUM_SC + j * NUM_SC + k;
-          cdiv(
-            sum_re, sum_im,
-            g_L.re[off_jjk],
-            g_L.im[off_jjk],
-            &g_L.re[off_ijk],
-            &g_L.im[off_ijk]);
-        }
-      }
-}
-
-void ccholesky_nosqrt_TxTx(
-  IN vcomplex *A,
-  OUT vcomplex *L,
-  OUT vcomplex *D)
-{
-  size_t i, j, k, l;
-  size_t off_iik, off_ijk, off_ilk, off_jlk;
-  size_t off_ik, off_jk;
-  data_t t1_re, t1_im, t2_re, t2_im;
-  data_t sum_re, sum_im;
-
-  /* Init zeros in upper triangles of L and D */
-  for (off_ijk = 0; off_ijk < NUM_TX_ANT * NUM_TX_ANT * NUM_SC; ++off_ijk)
-    L->re[off_ijk] = L->im[off_ijk] = D->re[off_ijk] = D->im[off_ijk] = 0;
-  /* Init zeros in lower triangle of D */
-  /* Init ones in the diagonal of the result */
-  for (off_ik = 0; off_ik < NUM_TX_ANT * NUM_SC; ++off_ik) {
-    L->im[off_ik] = D->re[off_ik] = D->im[off_ik] = 0;
-    L->re[off_ik] = 1;
-  }
-
-  /* Calculate the lower triangle of the result */
-  for (k = 0; k != NUM_SC; ++k) {
-    for (i = 0; i != NUM_TX_ANT; ++i) {
-      off_iik = i * NUM_TX_ANT * NUM_SC + i * NUM_SC + k;
-      /* L_ij = (A_ij - \sum_{l=0}^{j-1} L_il L_jl^* D_k) / D_j */
-      for (j = 0; j != i; ++j) {
-        for (l = 0; l != j; ++l) {
-          off_ilk = i * NUM_TX_ANT * NUM_SC + l * NUM_SC + k;
-          off_jlk = j * NUM_TX_ANT * NUM_SC + l * NUM_SC + k;
-          t1_re = L->re[off_ilk];
-          t1_im = L->im[off_ilk];
-          t2_re = L->re[off_jlk];
-          t2_im = L->im[off_jlk];
-          sum_re += t1_re * t2_re + t1_im * t2_im;
-          sum_im += t1_im * t2_re - t1_re * t2_im;
-        }
-        off_ijk = i * NUM_TX_ANT * NUM_SC + j * NUM_SC + k;
-        off_jk = j * NUM_SC + k;
-        t1_re = A->re[off_ijk] - sum_re;
-        t1_im = A->im[off_ijk] - sum_im;
-        cdiv(
-          t1_re, t1_im,
-          D->re[off_jk], D->im[off_jk],
-          &L->re[off_ijk],
-          &L->im[off_ijk]);
-      }
-      /* D_i = A_ii - \sum_{j=0}^{i-1} L_ij L_ij^* D_j */
-      sum_re = sum_im = 0;
-      off_ik = i * NUM_SC + k;
-      for (j = 0; j != i; ++j) {
-        off_ijk = i * NUM_TX_ANT * NUM_SC + j * NUM_SC + k;
-        off_jk = j * NUM_SC + k;
-        t1_re = L->re[off_ijk];
-        t1_im = L->im[off_ijk];
-        t2_re = t1_re * t1_re + t1_im * t1_im;
-        t2_im = t1_re * t1_im - t1_im * t1_re;
-        t1_re = D->re[off_jk];
-        t1_im = D->im[off_jk];
-        sum_re += t2_re * t1_re - t2_im * t1_im;
-        sum_im += t2_re * t1_im + t2_im * t1_re;
-      }
-      D->re[off_ik] = A->re[off_iik] - sum_re;
-      D->im[off_ik] = A->im[off_iik] - sum_im;
-    }
-  }
 }
 
 /** Complex matrix-vector multiplication HHy = HH*y
@@ -357,26 +327,26 @@ void cmatvecmul_TxRx()
   size_t off_HH, off_y, off_HHy, off_sc;
   size_t sz, vl;
 
-  for (i = 0; i < NUM_TX_ANT; ++i) {
-    off_HHy = i * NUM_SC;
+  for (i = 0; i < num_tx_cur; ++i) {
+    off_HHy = i * num_sc_cur;
     off_sc = 0;
-    sz = NUM_SC;
-
-    /* Initialize result registers */
-    /* v0 - HHy real part */
-    /* v1 - HHy imaginary part */
-    __asm__ volatile(
-      "vsetvli %0, %1, e32, m1, ta, ma\n"
-      "vmv.v.i v0, 0\n"
-      "vmv.v.i v1, 0\n"
-      : "=r"(vl)
-      : "r"(sz)
-    );
+    sz = num_sc_cur;
 
     while (sz > 0) {
-      for (j = 0; j < NUM_RX_ANT; ++j) {
-        off_HH = i * NUM_RX_ANT * NUM_SC + j * NUM_SC + off_sc;
-        off_y = j * NUM_SC + off_sc;
+      /* Initialize result registers */
+      /* v0 - HHy real part */
+      /* v1 - HHy imaginary part */
+      __asm__ volatile(
+        "vsetvli %0, %1, e32, m1, ta, ma\n"
+        "vmv.v.i v0, 0\n"
+        "vmv.v.i v1, 0\n"
+        : "=r"(vl)
+        : "r"(sz)
+      );
+
+      for (j = 0; j < num_rx_cur; ++j) {
+        off_HH = i * num_rx_cur * num_sc_cur + j * num_sc_cur + off_sc;
+        off_y = j * num_sc_cur + off_sc;
         __asm__ volatile(
           "vle32.v v2, (%0)\n"
           "vle32.v v3, (%1)\n"
@@ -423,9 +393,9 @@ void cforwardsub_TxTx()
   size_t sz, vl;
   size_t off_sc;
 
-  for (i = 0; i != NUM_TX_ANT; ++i) {
+  for (i = 0; i < num_tx_cur; ++i) {
     off_sc = 0;
-    sz = NUM_SC;
+    sz = num_sc_cur;
 
     while (sz > 0) {
       // printf("sz: %lu\n", sz);
@@ -441,8 +411,8 @@ void cforwardsub_TxTx()
         "vle32.v v0, (%0)\n"
         "vle32.v v1, (%1)\n"
         :
-        : "r"(&g_HHy.re[i * NUM_SC + off_sc]),
-          "r"(&g_HHy.im[i * NUM_SC + off_sc]));
+        : "r"(&g_HHy.re[i * num_sc_cur + off_sc]),
+          "r"(&g_HHy.im[i * num_sc_cur + off_sc]));
       // printf("vl: %lu\n", vl);
 
       for (j = 0; j != i; ++j) {
@@ -463,10 +433,10 @@ void cforwardsub_TxTx()
           "vfnmsac.vv v1, v3, v4\n"
           "vfnmsac.vv v1, v2, v5\n"
           :
-          : "r"(&g_L.re[i * NUM_TX_ANT * NUM_SC + j * NUM_SC + off_sc]),
-            "r"(&g_L.im[i * NUM_TX_ANT * NUM_SC + j * NUM_SC + off_sc]),
-            "r"(&g_z.re[j * NUM_SC + off_sc]),
-            "r"(&g_z.im[j * NUM_SC + off_sc])
+          : "r"(&g_L.re[i * num_tx_cur * num_sc_cur + j * num_sc_cur + off_sc]),
+            "r"(&g_L.im[i * num_tx_cur * num_sc_cur + j * num_sc_cur + off_sc]),
+            "r"(&g_z.re[j * num_sc_cur + off_sc]),
+            "r"(&g_z.im[j * num_sc_cur + off_sc])
         );
       }
 
@@ -491,10 +461,10 @@ void cforwardsub_TxTx()
         "vse32.v v0, (%2)\n"
         "vse32.v v1, (%3)\n"
         :
-        : "r"(&g_L.re[i * NUM_TX_ANT * NUM_SC + i * NUM_SC + off_sc]),
-          "r"(&g_L.im[i * NUM_TX_ANT * NUM_SC + i * NUM_SC + off_sc]),
-          "r"(&g_z.re[i * NUM_SC + off_sc]),
-          "r"(&g_z.im[i * NUM_SC + off_sc])
+        : "r"(&g_L.re[i * num_tx_cur * num_sc_cur + i * num_sc_cur + off_sc]),
+          "r"(&g_L.im[i * num_tx_cur * num_sc_cur + i * num_sc_cur + off_sc]),
+          "r"(&g_z.re[i * num_sc_cur + off_sc]),
+          "r"(&g_z.im[i * num_sc_cur + off_sc])
       );
 
       off_sc += vl;
@@ -517,9 +487,9 @@ void cbackwardsub_TxTx()
   size_t sz, vl;
   size_t off_sc;
 
-  for (i = NUM_TX_ANT - 1; i != 0; --i) {
+  for (i = num_tx_cur - 1; i != (size_t)-1; --i) {
     off_sc = 0;
-    sz = NUM_SC;
+    sz = num_sc_cur;
 
     while (sz > 0){
       /* Initialize result registers as z */
@@ -533,10 +503,10 @@ void cbackwardsub_TxTx()
         "vle32.v v0, (%0)\n"
         "vle32.v v1, (%1)\n"
         :
-        : "r"(&g_z.re[i * NUM_SC + off_sc]),
-          "r"(&g_z.im[i * NUM_SC + off_sc]));
+        : "r"(&g_z.re[i * num_sc_cur + off_sc]),
+          "r"(&g_z.im[i * num_sc_cur + off_sc]));
 
-      for (j = i + 1; j < NUM_TX_ANT; ++j) {
+      for (j = i + 1; j < num_tx_cur; ++j) {
         /* b - sum L_ji * z_j */
         /* v2 - L real part */
         /* v3 - L imaginary part */
@@ -554,10 +524,10 @@ void cbackwardsub_TxTx()
           "vfnmsac.vv v1, v3, v4\n"
           "vfnmsac.vv v1, v2, v5\n"
           :
-          : "r"(&g_L.re[j * NUM_TX_ANT * NUM_SC + i * NUM_SC + off_sc]),
-            "r"(&g_L.im[j * NUM_TX_ANT * NUM_SC + i * NUM_SC + off_sc]),
-            "r"(&g_x_MMSE.re[j * NUM_SC + off_sc]),
-            "r"(&g_x_MMSE.im[j * NUM_SC + off_sc])
+          : "r"(&g_L.re[j * num_tx_cur * num_sc_cur + i * num_sc_cur + off_sc]),
+            "r"(&g_L.im[j * num_tx_cur * num_sc_cur + i * num_sc_cur + off_sc]),
+            "r"(&g_x_MMSE.re[j * num_sc_cur + off_sc]),
+            "r"(&g_x_MMSE.im[j * num_sc_cur + off_sc])
         );
       }
 
@@ -582,10 +552,10 @@ void cbackwardsub_TxTx()
         "vse32.v v0, (%2)\n"
         "vse32.v v1, (%3)\n"
       :
-      : "r"(&g_L.re[i * NUM_TX_ANT * NUM_SC + i * NUM_SC + off_sc]),
-        "r"(&g_L.im[i * NUM_TX_ANT * NUM_SC + i * NUM_SC + off_sc]),
-        "r"(&g_x_MMSE.re[i * NUM_SC + off_sc]),
-        "r"(&g_x_MMSE.im[i * NUM_SC + off_sc])
+      : "r"(&g_L.re[i * num_tx_cur * num_sc_cur + i * num_sc_cur + off_sc]),
+        "r"(&g_L.im[i * num_tx_cur * num_sc_cur + i * num_sc_cur + off_sc]),
+        "r"(&g_x_MMSE.re[i * num_sc_cur + off_sc]),
+        "r"(&g_x_MMSE.im[i * num_sc_cur + off_sc])
       );
 
       sz -= vl;
@@ -626,8 +596,8 @@ acc_t mse()
   acc_t sum = 0.;
   size_t off = 0;
   data_t sub1, sub2;
-  size_t sz = NUM_TX_ANT * NUM_SC, vl;
-  register data_t num_tx_num_sc_reg __asm__("f0") = (data_t)(NUM_TX_ANT * NUM_SC); 
+  size_t sz = num_tx_cur * num_sc_cur, vl;
+  register data_t num_tx_num_sc_reg __asm__("f0") = (data_t)(num_tx_cur * NUM_SC); 
 
   while (sz > 0) {
     __asm__ volatile (
