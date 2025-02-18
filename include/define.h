@@ -5,8 +5,6 @@
 #define NUM_TX_ANT 4
 #define NUM_SC 1
 
-#define NOSQRT 1
-
 #define DEBUG
 
 #define IN
