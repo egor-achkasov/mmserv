@@ -1,36 +1,81 @@
 # MMSE on RISC-V
 
-Forked from [gfdmrv](https://gitlab.vodafone-chair.org/viktor.razilov/gfdmrv) and [lte-benchmark-code](https://gitlab.vodafone-chair.org/viktor.razilov/lte-benchmark-code).
+Linear Minimum Mean Squared Error (MMSE) Multiple Input Multiple Output (MIMO) detector for RISC-V with support for "V" Vector Extension based on Cholesky decomposition. Supports [ARA](https://www.github.com/pulp-platform/ara) and baremetal. Implements fixed- and floating-point solutions (LDL and LL Cholesky decompositions respectively). Vectorizes along the subcarriers dimension.
+
+## Key Concepts
+
+Multiple user antennas transmit data (`x`) to a base station equiped with multiple receiving antennas. Application of a multiplexing channel `H` and noise `n` yields a received signal vector `y`. Channel and noise estimators support with the channel matrix `H` and a noise covariance matrix `R`. This program implements a detector that approximates `x` from `y`, `H` and `R`.
+
+![MIMO Detection on base station concept](imgs/MIMOBS.png)
+
+### Definitions
+
+- `NUM_RX` - number of receiving antennas.
+- `NUM_TX` - number of transmitting antennas.
+- `NUM_SC` - number of subcarriers.
+- `x` - transmitted signal.
+- `y` - received signal.
+- `H` - multiplexing channel matrix.
+- `n` - noise vector on the receiving antennas.
+- `R` - noise covariance matrix.
+
+### Method
+
+Find such `x` that `x = G^{-1} H^H y` where G is a Gram matrix defined as `G = (H^H H + R)` and `H^H` is a Hermittian transpose of `H`. This is done in 5 steps:
+- `cmatgram`: Calculate `G = H^H H + R`
+- `ccholesky`: Perform Cholesky decomposition (`G=LL^H` or `G=LDL^H`)
+- `cmatvecmul`: Multiply `H^H` and `y` (`HHy=H^H y`)
+- `cforwardsub`: Perform forward substitution to find such `z` that `Lz=HHy`
+- `cbackwardsub`: Perform backward substitution to find such `x` that `z=L^H x` (or `D^{-1} z = L^H x` in case of LDL Cholesky)
+
+The following data flow diagrams demonstrate element-wise formulas for both LL and LDL based detection:
+![The solution data dlow diagrams](imgs/dataflow.png)
+
+## Structure
+
+Each of the five operations is implemented in its source file in `src`. `main.c` contains memory intialization and cycles measurments for each function.
+
+`scripts/gen_data.py` generates `x`, `H`, `R` and `n` in `data` directory. `re` and `im` in the names mean real and imaginary parts. Then the data is loaded diectly into the program memory compile-time in `main.c` (thanks to [ChaN](https://elm-chan.org/junk/32bit/binclude.html) for sharing the macro).
 
 ## Configuration
 
-Set up defines in `inc/define.h` before using the tool.
-- NUM_RX_ANT - number of recieving antennas
-- NUM_TX_ANT - number of transmitting antennas
-- NUM_SC - number of subcarriers 
-
-## Data generation
-
-Generate data with `scripts/gen_data.py`.
+Compile by passing configuration parameters to make:
 
 ```
-$ python scripts/gen_data.py --help
+$ make help
+
+Usage:
+  make [ARCH=<arch>] [DATA_TYPE=<type>] [PLATFORM=<platform>] [NUM_RX=<num_rx>] [NUM_TX=<num_tx>] [NUM_SC=<num_sc>]
+
+Supported ARCH values:
+  - x86 (default)
+  - rv
+  - rvv
+
+Supported DATA_TYPE values:
+  - float (default)
+  - fixed
+
+Supported PLATFORM values:
+  - linux (default)
+  - ara
+  - baremetal
+
+Supported NUM_RX values: integers > 0 (default = 4)
+Supported NUM_TX values: integers > 0 (default = 4)
+Supported NUM_SC values: integers > 0 (default = 1024)
 ```
 
-There are 4 variables that are generated:
-- x - transmitted signal
-- H - channel signal
-- R - noise correlation matrix
-- y - received signal
+- `ARCH`:
+  - `x86` - (x86-64) for testing purposes. Sequential solution, no vectorization.
+  - `rv` - RISC-V 64 (rv64) without "V" extension. Sequential solution, no vectorization. 
+  - `rvv` - rv64v. Vectorized solution.
+- `DATA_TYPE`:
+  - `float` - all the data and computation is done with `float`. Requires "F" extension.
+  - `fixed` - Q31 fixed-point.
+- `PLATFORM` - this parameter currently only affects `printf`:
+  - `linux` - `printf` from `<stdio.h>`
+  - `ara` - ARA's `printf` from `apps/common`. Assumes the repository is in the `apps` directory`.
+  - `baremental` - simple UART printf strictly to output the cycles as used in `main.c`. **NOT IMPLEMENTED YET**.
 
-The data is generated as complex floating point. It is interleaved into int16 before output. Interleaved data contains real values on even positions and imaginary values on odd positions. Interleaving and deinterleaving functions can be found in `scripts/util.py`.
-
-- txt files are line separated entries
-- bin files are densly concatenated values
-- S file an asm data file with multiple sections for each variable. Note that running `python scripts/gen_data.py --s` outputs the file into stdout, so consider using `> data.S`.  
-
-## Data visualization
-
-The program outputs the approximated `x` into `out/x_mmse.bin`. Run `python scripts/viz_compare_x.py` to plot the actual and approximated signal samples, assuming that `data/x.bin` exists.
-
-It is possible to compare the C implementation with a simple python numpy one. Running `python scripts/mmse.py` creates `out/x_mmse_python.bin` assuming that `data/x.bin` exists. Plot it together with the C approximation by `cp out/x_mmse_python.bin bin/x.bin`. Compare it with the original signal by `cp out/x_mmse_python.bin out/x_mmse.bin`.
+Running `make` with the given parameters will create `build` directory and an `.elf` with the parameters in its name.
