@@ -71,8 +71,8 @@ Supported NUM_SC values: integers > 0 (default = 1024)
   - `rv` - RISC-V 64 (rv64) without "V" extension. Sequential solution, no vectorization. 
   - `rvv` - rv64v. Vectorized solution.
 - `DATA_TYPE`:
-  - `float` - all the data and computation is done with `float`. Requires "F" extension.
-  - `fixed` - Q31 fixed-point.
+  - `float` - all the data and computation is done with `float`. Requires "F" extension. Uses LL Cholesky.
+  - `fixed` - Q31 fixed-point. Uses LDL Cholesky.
 - `PLATFORM` - this parameter currently only affects `printf`:
   - `linux` - `printf` from `<stdio.h>`
   - `ara` - ARA's `printf` from `apps/common`. Assumes the repository is in the `apps` directory`.
