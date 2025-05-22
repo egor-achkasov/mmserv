@@ -64,6 +64,10 @@ Supported PLATFORM values:
 Supported NUM_RX values: integers > 0 (default = 4)
 Supported NUM_TX values: integers > 0 (default = 4)
 Supported NUM_SC values: integers > 0 (default = 1024)
+
+Debug mode:
+  - DEBUG=0 (default, optimized with -O1)
+  - DEBUG=1 (debug mode with -g -O0)
 ```
 
 - `ARCH`:
