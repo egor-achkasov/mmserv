@@ -39,6 +39,14 @@ CFLAGS += -DNUM_RX=$(NUM_RX)
 CFLAGS += -DNUM_TX=$(NUM_TX)
 CFLAGS += -DNUM_SC=$(NUM_SC)
 
+# DEBUG flag
+DEBUG ?= 0
+ifeq ($(DEBUG),1)
+    CFLAGS += -g -O0
+else
+    CFLAGS += -O0
+endif
+
 # Compiler selection
 ifeq ($(ARCH),x86)
 	CC := gcc
@@ -47,7 +55,7 @@ else
 endif
 
 # Output file
-OUTPUT := build/mmse_$(ARCH)_$(DATA_TYPE)_$(PLATFORM)_$(NUM_RX)x$(NUM_TX)x$(NUM_SC).elf
+OUTPUT := build/mmse_$(ARCH)_$(DATA_TYPE)_$(PLATFORM)_$(NUM_RX)x$(NUM_TX)x$(NUM_SC)$(if $(filter 1,$(DEBUG)),_debug.elf,.elf)
 
 # Source files
 SRCS := main.c $(wildcard src/*.c)
@@ -89,6 +97,10 @@ help:
 	@echo "Supported NUM_RX values: integers > 0 (default = 4)"
 	@echo "Supported NUM_TX values: integers > 0 (default = 4)"
 	@echo "Supported NUM_SC values: integers > 0 (default = 1024)"
+	@echo ""
+	@echo "Debug mode:"
+	@echo "  - DEBUG=0 (default, optimized with -O1)"
+	@echo "  - DEBUG=1 (debug mode with -g -O0)"
 
 # Remove build directory
 clean:
