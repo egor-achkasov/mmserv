@@ -31,30 +31,30 @@ typedef struct {
 
 /* Raw data */
 /* Transmitted signal */
-extern data_t x_re[NUM_TX][NUM_SC];
-extern data_t x_im[NUM_TX][NUM_SC];
+extern data_t x_re[NUM_TX * NUM_SC];
+extern data_t x_im[NUM_TX * NUM_SC];
 /* Channel */
-extern data_t H_re[NUM_RX][NUM_TX][NUM_SC];
-extern data_t H_im[NUM_RX][NUM_TX][NUM_SC];
+extern data_t H_re[NUM_RX * NUM_TX * NUM_SC];
+extern data_t H_im[NUM_RX * NUM_TX * NUM_SC];
 /* Noise covariance matrix */
-extern data_t R_re[NUM_TX][NUM_TX][NUM_SC];
-extern data_t R_im[NUM_TX][NUM_TX][NUM_SC];
+extern data_t R_re[NUM_TX * NUM_TX * NUM_SC];
+extern data_t R_im[NUM_TX * NUM_TX * NUM_SC];
 /* Received signal */
-extern data_t y_re[NUM_RX][NUM_SC];
-extern data_t y_im[NUM_RX][NUM_SC];
+extern data_t y_re[NUM_RX * NUM_SC];
+extern data_t y_im[NUM_RX * NUM_SC];
 /* MMSE raw data */
-extern data_t G_re[NUM_TX][NUM_TX][NUM_SC];
-extern data_t G_im[NUM_TX][NUM_TX][NUM_SC];
-extern data_t L_re[NUM_TX][NUM_TX][NUM_SC];
-extern data_t L_im[NUM_TX][NUM_TX][NUM_SC];
-extern data_t g_D[NUM_TX][NUM_SC]; /* no imaginary part in D */
-extern data_t HHy_re[NUM_TX][NUM_SC];
-extern data_t HHy_im[NUM_TX][NUM_SC];
-extern data_t z_re[NUM_TX][NUM_SC];
-extern data_t z_im[NUM_TX][NUM_SC];
+extern data_t G_re[NUM_TX * NUM_TX * NUM_SC];
+extern data_t G_im[NUM_TX * NUM_TX * NUM_SC];
+extern data_t L_re[NUM_TX * NUM_TX * NUM_SC];
+extern data_t L_im[NUM_TX * NUM_TX * NUM_SC];
+extern data_t g_D[NUM_TX * NUM_SC]; /* no imaginary part in D */
+extern data_t HHy_re[NUM_TX * NUM_SC];
+extern data_t HHy_im[NUM_TX * NUM_SC];
+extern data_t z_re[NUM_TX * NUM_SC];
+extern data_t z_im[NUM_TX * NUM_SC];
 /* Result of MMSE approximation */
-extern data_t x_MMSE_re[NUM_TX][NUM_SC];
-extern data_t x_MMSE_im[NUM_TX][NUM_SC];
+extern data_t x_MMSE_re[NUM_TX * NUM_SC];
+extern data_t x_MMSE_im[NUM_TX * NUM_SC];
 
 /* Same data but casted to vcomplex */
 extern vcomplex g_x;

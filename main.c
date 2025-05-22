@@ -36,17 +36,17 @@ IMPORT_BIN(.rodata, "data/y_re.bin", y_re);
 IMPORT_BIN(.rodata, "data/y_im.bin", y_im);
 
 /* Allocate space for MMSE raw data */
-data_t G_re[NUM_TX][NUM_TX][NUM_SC];
-data_t G_im[NUM_TX][NUM_TX][NUM_SC];
-data_t L_re[NUM_TX][NUM_TX][NUM_SC];
-data_t L_im[NUM_TX][NUM_TX][NUM_SC];
-data_t g_D[NUM_TX][NUM_SC]; /* no imaginary part in D */
-data_t HHy_re[NUM_TX][NUM_SC];
-data_t HHy_im[NUM_TX][NUM_SC];
-data_t z_re[NUM_TX][NUM_SC];
-data_t z_im[NUM_TX][NUM_SC];
-data_t x_MMSE_re[NUM_TX][NUM_SC];
-data_t x_MMSE_im[NUM_TX][NUM_SC];
+data_t G_re[NUM_TX * NUM_TX * NUM_SC];
+data_t G_im[NUM_TX * NUM_TX * NUM_SC];
+data_t L_re[NUM_TX * NUM_TX * NUM_SC];
+data_t L_im[NUM_TX * NUM_TX * NUM_SC];
+data_t g_D[NUM_TX * NUM_SC]; /* no imaginary part in D */
+data_t HHy_re[NUM_TX * NUM_SC];
+data_t HHy_im[NUM_TX * NUM_SC];
+data_t z_re[NUM_TX * NUM_SC];
+data_t z_im[NUM_TX * NUM_SC];
+data_t x_MMSE_re[NUM_TX * NUM_SC];
+data_t x_MMSE_im[NUM_TX * NUM_SC];
 
 /* Initialize data */
 vcomplex g_x = { .re = (data_t *)x_re, .im = (data_t *)x_im };
